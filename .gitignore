@@ -1,0 +1,40 @@
+# Security / Secrets
+.env
+.env.*
+*.pem
+*.key
+omniagentpay_recovery.txt
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distributions / Build
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+.venv
+venv/
+ENV/
+env/
+
+# Testing / Quality
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log

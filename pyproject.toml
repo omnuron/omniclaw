@@ -1,0 +1,113 @@
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+
+[project]
+name = "omniagentpay"
+dynamic = ["version"]
+description = "The Payment Infrastructure Layer for Autonomous AI Agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Abiola Adeshina", email = "abiolaadedayo1993@gmail.com" },
+    { name = "OmniAgentPay Team" }
+]
+keywords = [
+    "ai",
+    "payments",
+    "usdc",
+    "blockchain",
+    "circle",
+    "x402",
+    "arc",
+    "agent",
+    "git",
+    "mcp",
+    "llm",
+    "automation"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "circle-developer-controlled-wallets>=9.1.0",
+    "pydantic>=2.12.0",
+    "httpx>=0.28.0",
+    "python-dotenv>=1.2.0",
+    "cryptography>=44.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.0",
+    "mypy>=1.19.0",
+    "pre-commit>=4.2.0",
+    "hatch>=1.14.1",
+    "twine>=6.1.0",
+]
+cli = [
+    "click>=8.3.0",
+    "rich>=14.0.0",
+    "prompt-toolkit>=3.0.50",
+    "pyyaml>=6.0.3",
+]
+mcp = [
+    "mcp>=1.25.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/omniagentpay/omniagentpay"
+Documentation = "https://omniagentpay.dev/docs"
+Repository = "https://github.com/omniagentpay/omniagentpay"
+
+[project.scripts]
+omniagentpay = "omniagentpay.cli:main"
+omniagentpay-mcp = "omniagentpay.mcp:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/omniagentpay"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/omniagentpay"]
+
+[tool.hatch.build]
+sources = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
