@@ -2,11 +2,12 @@ name: Build Cross-Platform Binaries
 
 on:
   release:
-    types: [created]
-  workflow_dispatch:  # Allow manual trigger
+    types: [published]
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
   build:
+    name: Build ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -29,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -41,19 +42,17 @@ jobs:
         run: |
           pyinstaller --onefile --name omniagentpay-server --paths src src/omniagentpay/server.py
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.artifact_name }}
+      # Rename binary to match asset name for clarity
+      - name: Rename binary
+        shell: bash
+        run: |
+          cd dist
+          mv ${{ matrix.artifact_name }} ${{ matrix.asset_name }}
 
       - name: Upload to Release
         if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/${{ matrix.asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: dist/${{ matrix.artifact_name }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/octet-stream
