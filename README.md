@@ -1,27 +1,54 @@
-# OmniAgentPay: Plug-and-Play Payment Infrastructure for AI Agents
+# OmniAgentPay
+
+> **The Payment Execution Infrastructure for AI Agents**
 
 [![PyPI version](https://badge.fury.io/py/omniagentpay.svg)](https://badge.fury.io/py/omniagentpay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **You've built an AI agent. Now it needs to pay for things.**
-> 
-> Add your Circle API key. Connect OmniAgentPay. Your agent has everything it needs to handle payments—safely, instantly, across any chain.
+**OmniAgentPay** gives AI agents the ability to autonomously spend money—safely, instantly, and across any blockchain.
 
-**OmniAgentPay** is the payment infrastructure layer that gives any AI agent the ability to:
-- 💳 **Pay addresses** directly (USDC transfers)
-- 🌐 **Pay APIs** that require payment (HTTP 402 / x402 protocol)
-- 🌉 **Pay cross-chain** seamlessly (Circle CCTP)
-- 🛡️ **Stay safe** with programmable spending limits (Guards)
+> 💡 *Think of it as Stripe for AI agents—except instead of helping merchants accept payments, we help agents make payments.*
 
-**Zero blockchain complexity. Zero private key management. One `pay()` call.**
+---
+
+## 🔑 What is OmniAgentPay?
+
+OmniAgentPay is a **developer SDK** that provides the complete payment infrastructure layer for autonomous AI agents:
+
+### Core Capabilities
+
+| Capability | Description |
+|:-----------|:------------|
+| 💳 **Developer-Controlled Wallets** | USDC wallets powered by Circle with full programmatic control |
+| 🛡️ **Atomic Spending Guards** | Budget, rate, transaction, and recipient limits that prevent runaway spending |
+| 🌐 **Universal Payment Routing** | Seamless routing across x402 APIs, direct transfers, and cross-chain (CCTP) |
+| 📊 **Complete Observability** | Built-in ledger, webhooks, and analytics for every transaction |
+| 🔌 **Framework Agnostic** | Works with LangChain, OmniCoreAgent, AutoGPT, or any custom agent |
+
+### What Agents Can Pay For
+
+- **APIs & Data Access** — x402 paywalled resources, premium data feeds
+- **Services & Compute** — Micro-services, GPU hours, cloud resources
+- **Subscriptions & Digital Goods** — SaaS tools, content, models
+- **Transfers & Payroll** — Batch payments to wallets, contractor payouts
+- **Agent-to-Agent Commerce** — A2A payments, escrow, streaming *(coming soon)*
+
+### The Buyer-Side Infrastructure
+
+OmniAgentPay complements payment protocols (x402, UCP, AP2) by providing the **execution logic**, **safety controls**, and **developer experience** that makes autonomous agent spending practical, safe, and observable.
+
+---
+
+## ⚡ Get Started in 3 Lines
 
 ```python
-# Give any AI agent payment superpowers in 3 lines:
 from omniagentpay import OmniAgentPay
 
 client = OmniAgentPay()  # Reads CIRCLE_API_KEY from env
 result = await client.pay(wallet_id="...", recipient="0x...", amount=10.00)
 ```
+
+**Zero blockchain complexity. Zero private key management. One `pay()` call.**
 
 ---
 
@@ -173,25 +200,42 @@ result = await client.pay(
 
 OmniAgentPay follows a **Hub-and-Spoke** architecture tailored for multi-agent systems.
 
+--
+
+## 🏗️ Architecture Overview
+
 ```
-[ AI Agent Code ]
-       |
-       v
-[ OmniAgentPay Client ]  <--- (Configuration & Secrets)
-       |
-       +--- [ Guard Kernel ] (Atomic Policy Enforcement)
-       |          |
-       |          +--- [ Storage Backend ] (Redis/Memory)
-       |
-       +--- [ Payment Router ]
-       |          |
-       |          +--- [ Transfer Adapter ] (Same-Chain)
-       |          +--- [ X402 Adapter ]     (Invoices)
-       |          +--- [ Gateway Adapter ]  (Cross-Chain)
-       |
-       v
-[ Circle Web3 Services ] ---> [ Blockchain Networks ]
+┌─────────────────────────────────────────────────┐
+│  APPLICATION LAYER                              │
+│  Research Agent │ Trading Bot │ HR Agent        │
+│  Built with: LangChain, OmniCoreAgent, etc.     │
+└────────────────────┬────────────────────────────┘
+                     │ uses
+                     ▼
+┌─────────────────────────────────────────────────┐
+│  🎯 OMNIAGENTPAY                                │
+│  Payment Execution Infrastructure               │
+│  • Wallets (Circle)    • Guards (Safety)        │
+│  • Router (x402, Transfer, Cross-Chain)         │
+│  • Ledger (Observability)                       │
+└────────────────────┬────────────────────────────┘
+                     │ implements
+                     ▼
+┌─────────────────────────────────────────────────┐
+│  PROTOCOL LAYER                                 │
+│  x402 │ UCP │ AP2 │ CCTP                        │
+└────────────────────┬────────────────────────────┘
+                     │ settles on
+                     ▼
+┌─────────────────────────────────────────────────┐
+│  BLOCKCHAIN LAYER                               │
+│  Arc │ Base │ Ethereum │ Solana                 │
+└─────────────────────────────────────────────────┘
 ```
+
+---
+
+
 
 ---
 
@@ -377,7 +421,7 @@ Best for autonomous agents. Creates a Wallet Set named `agent-{name}` and a wall
 ```python
 wallet_set, wallet = await client.create_agent_wallet(
     agent_name="ShoppingBot-1",
-    blockchain=Network.BASE     # Optional: Specify chain
+    blockchain=Network.ARC    # Optional: Specify chain
 )
 ```
 
@@ -405,7 +449,7 @@ agent_a = await client.create_wallet(
 )
 agent_b = await client.create_wallet(
     wallet_set_id=marketing_swarm.id, 
-    blockchain=Network.BASE
+    blockchain=Network.ARC
 )
 ```
 

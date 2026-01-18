@@ -1,6 +1,4 @@
-# Dependencies
-node_modules/
-omniagentpay-js/node_modules/
+
 # Security / Secrets
 
 .env
