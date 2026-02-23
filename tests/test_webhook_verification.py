@@ -4,7 +4,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from omniagentpay.webhooks.parser import InvalidSignatureError, WebhookParser
+from omniclaw.webhooks.parser import InvalidSignatureError, WebhookParser
 
 
 @pytest.fixture

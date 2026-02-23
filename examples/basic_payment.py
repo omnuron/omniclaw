@@ -1,7 +1,7 @@
 """
 Example: Basic Payment Flow
 
-Demonstrates the simplest way to use OmniAgentPay SDK.
+Demonstrates the simplest way to use OmniClaw SDK.
 """
 
 import asyncio
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
 
 
 async def main():
@@ -21,11 +21,11 @@ async def main():
     2. List wallets
     3. Make a payment (simulated)
     """
-    print("=== OmniAgentPay Basic Example ===\n")
+    print("=== OmniClaw Basic Example ===\n")
 
     # Step 1: Initialize client
     # Reads CIRCLE_API_KEY and ENTITY_SECRET from environment
-    client = OmniAgentPay(network=Network.ARC_TESTNET)
+    client = OmniClaw(network=Network.ARC_TESTNET)
     print("✅ Client initialized")
 
     # Step 2: List existing wallets

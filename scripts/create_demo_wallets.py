@@ -16,8 +16,8 @@ load_dotenv(project_root / ".env")
 # Add src to path
 sys.path.insert(0, str(project_root / "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 async def main():
@@ -30,8 +30,8 @@ async def main():
         print(f"   ENTITY_SECRET: {'SET' if entity_secret else 'NOT SET'}")
         return
     
-    print("🏗️  Creating OmniAgentPay client...")
-    client = OmniAgentPay(
+    print("🏗️  Creating OmniClaw client...")
+    client = OmniClaw(
         circle_api_key=api_key,
         entity_secret=entity_secret,
     )

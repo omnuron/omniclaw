@@ -1,6 +1,6 @@
-# OmniAgentPay SDK - Complete Usage Guide
+# OmniClaw SDK - Complete Usage Guide
 
-**OmniAgentPay** is the payment infrastructure layer for autonomous AI agents. It abstracts blockchain complexity into a unified interface while enforcing strict safety boundaries.
+**OmniClaw** is the payment infrastructure layer for autonomous AI agents. It abstracts blockchain complexity into a unified interface while enforcing strict safety boundaries.
 
 **Key Features:**
 *   **Zero Config**: Just provide your Circle API key. Entity Secret is auto-generated.
@@ -17,10 +17,10 @@
 
 ```python
 import logging
-from omniagentpay import OmniAgentPay, Network
+from omniclaw import OmniClaw, Network
 
 # Just provide your API key - Entity Secret is auto-generated if missing!
-client = OmniAgentPay(
+client = OmniClaw(
     circle_api_key="YOUR_CIRCLE_API_KEY",  # Or set CIRCLE_API_KEY env var
     network=Network.ARC_TESTNET,            # Recommended: Arc Testnet for hackathon
     log_level=logging.DEBUG                 # Enable full traceability
@@ -39,13 +39,13 @@ CIRCLE_API_KEY=sk_your_api_key_here
 
 ```python
 # Client reads from environment automatically
-client = OmniAgentPay()  # Zero config!
+client = OmniClaw()  # Zero config!
 ```
 
 ### Async Context Manager
 
 ```python
-async with OmniAgentPay() as client:
+async with OmniClaw() as client:
     result = await client.pay(...)
     # Resources cleaned up automatically
 ```
@@ -274,7 +274,7 @@ await client.cancel_payment_intent(intent.id)
 ## 🚀 7. Batch Payments
 
 ```python
-from omniagentpay import PaymentRequest
+from omniclaw import PaymentRequest
 
 requests = [
     PaymentRequest(wallet_id=w1.id, recipient="0xA...", amount=10),
@@ -293,9 +293,9 @@ print(f"Success: {batch_result.success_count}/{batch_result.total_count}")
 ### Logging
 
 ```python
-client = OmniAgentPay(log_level=logging.DEBUG)  # See everything
-client = OmniAgentPay(log_level=logging.INFO)   # High-level flow
-client = OmniAgentPay(log_level=logging.WARNING) # Only issues
+client = OmniClaw(log_level=logging.DEBUG)  # See everything
+client = OmniClaw(log_level=logging.INFO)   # High-level flow
+client = OmniClaw(log_level=logging.WARNING) # Only issues
 ```
 
 ### Ledger

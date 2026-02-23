@@ -14,13 +14,13 @@ import sys
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 async def main():
     # Initialize client
-    client = OmniAgentPay.from_env()
+    client = OmniClaw.from_env()
     
     print("=" * 60)
     print("CCTP TEST WALLET SETUP")

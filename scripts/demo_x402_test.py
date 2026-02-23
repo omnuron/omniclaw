@@ -13,8 +13,8 @@ from decimal import Decimal
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 # Configuration - UPDATE THESE WITH YOUR WALLET IDs FROM demo_wallets.txt
@@ -23,7 +23,7 @@ SELLER_ARC_ADDRESS = "your-seller-arc-address-here"  # ARC-TESTNET
 SELLER_BASE_ADDRESS = "your-seller-base-address-here"  # BASE-SEPOLIA
 
 
-async def test_same_chain(client: OmniAgentPay):
+async def test_same_chain(client: OmniClaw):
     """Test same-chain x402 payment (ARC → ARC)"""
     print("\n" + "="*60)
     print("TEST 1: Same-Chain Payment (ARC-TESTNET → ARC-TESTNET)")
@@ -63,7 +63,7 @@ async def test_same_chain(client: OmniAgentPay):
         print(f"\n💥 Exception: {e}")
 
 
-async def test_cross_chain(client: OmniAgentPay):
+async def test_cross_chain(client: OmniClaw):
     """Test cross-chain x402 payment (ARC → BASE via CCTP)"""
     print("\n" + "="*60)
     print("TEST 2: Cross-Chain Payment (ARC-TESTNET → BASE-SEPOLIA)")
@@ -127,7 +127,7 @@ async def main():
     
     print("🚀 Starting x402 Demo Tests")
     
-    client = OmniAgentPay(
+    client = OmniClaw(
         circle_api_key=api_key,
         entity_secret=entity_secret,
     )

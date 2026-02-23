@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.parent
 load_dotenv(project_root / ".env")
 sys.path.insert(0, str(project_root / "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 async def main():
@@ -26,7 +26,7 @@ async def main():
     
     print("🏗️  Creating ETH-SEPOLIA wallet for CCTP testing...")
     
-    client = OmniAgentPay(
+    client = OmniClaw(
         circle_api_key=api_key,
         entity_secret=entity_secret,
     )
@@ -47,7 +47,7 @@ async def main():
     print("1. Fund this wallet with USDC on ETH-SEPOLIA")
     print("2. Update x402_client_demo.py:")
     print(f"   AGENT_WALLET_ID = \"{wallet.id}\"")
-    print(f"3. Update OmniAgentPay network to ETH_SEPOLIA")
+    print(f"3. Update OmniClaw network to ETH_SEPOLIA")
     print("4. Run the cross-chain test (ETH → BASE)")
     print()
 

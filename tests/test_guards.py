@@ -9,13 +9,13 @@ from decimal import Decimal
 
 import pytest
 
-from omniagentpay.guards.base import GuardChain, GuardResult, PaymentContext
-from omniagentpay.guards.budget import BudgetGuard
-from omniagentpay.guards.confirm import ConfirmGuard
-from omniagentpay.guards.rate_limit import RateLimitGuard
-from omniagentpay.guards.recipient import RecipientGuard
-from omniagentpay.guards.single_tx import SingleTxGuard
-from omniagentpay.storage.memory import InMemoryStorage
+from omniclaw.guards.base import GuardChain, GuardResult, PaymentContext
+from omniclaw.guards.budget import BudgetGuard
+from omniclaw.guards.confirm import ConfirmGuard
+from omniclaw.guards.rate_limit import RateLimitGuard
+from omniclaw.guards.recipient import RecipientGuard
+from omniclaw.guards.single_tx import SingleTxGuard
+from omniclaw.storage.memory import InMemoryStorage
 
 
 @pytest.fixture
@@ -229,7 +229,7 @@ class TestRateLimitGuard:
 
     @pytest.mark.asyncio
     async def test_allows_first_payment(self, payment_context):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         guard = RateLimitGuard(max_per_minute=5)
@@ -239,7 +239,7 @@ class TestRateLimitGuard:
 
     @pytest.mark.asyncio
     async def test_blocks_after_limit(self, payment_context):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         guard = RateLimitGuard(max_per_minute=2)
@@ -258,7 +258,7 @@ class TestRateLimitGuard:
 
     @pytest.mark.asyncio
     async def test_hourly_limit(self, payment_context):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         guard = RateLimitGuard(max_per_hour=1)

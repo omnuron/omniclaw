@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from decimal import Decimal
 import pytest
 
-from omniagentpay.core.config import Config
-from omniagentpay.core.types import (
+from omniclaw.core.config import Config
+from omniclaw.core.types import (
     Network, 
     TransactionInfo, 
     TransactionState, 
@@ -14,8 +14,8 @@ from omniagentpay.core.types import (
     CustodyType,
     AccountType
 )
-from omniagentpay.protocols.gateway import GatewayAdapter
-from omniagentpay.wallet.service import WalletService
+from omniclaw.protocols.gateway import GatewayAdapter
+from omniclaw.wallet.service import WalletService
 
 @pytest.fixture
 def mock_config():
@@ -122,7 +122,7 @@ async def test_execute_cctp_forces_mint_on_arc(mock_config, mock_wallet_service)
         mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
         
         # Mock gas check import or method
-        with patch("omniagentpay.protocols.gateway.check_gas_requirements", create=True) as mock_gas:
+        with patch("omniclaw.protocols.gateway.check_gas_requirements", create=True) as mock_gas:
              mock_gas.return_value = (True, None) # has gas
              
              # Call execute

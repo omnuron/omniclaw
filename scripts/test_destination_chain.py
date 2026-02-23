@@ -10,8 +10,8 @@ sys.modules["circle.web3"] = MagicMock()
 # Mock Config Env
 import os  # noqa: E402
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
-from omniagentpay.core.types import (  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
+from omniclaw.core.types import (  # noqa: E402
     AccountType,
     CustodyType,
     PaymentMethod,
@@ -29,7 +29,7 @@ async def test_routing():
     print("=== Testing Destination Chain Routing ===")
 
     # 1. Setup Client with Mocks
-    client = OmniAgentPay(network=Network.ETH_SEPOLIA)
+    client = OmniClaw(network=Network.ETH_SEPOLIA)
 
     # Mock WalletService to return a known wallet on ETH_SEPOLIA
     mock_wallet = WalletInfo(

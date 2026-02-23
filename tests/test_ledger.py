@@ -8,13 +8,13 @@ from decimal import Decimal
 
 import pytest
 
-from omniagentpay.ledger import (
+from omniclaw.ledger import (
     Ledger,
     LedgerEntry,
     LedgerEntryStatus,
     LedgerEntryType,
 )
-from omniagentpay.storage.memory import InMemoryStorage
+from omniclaw.storage.memory import InMemoryStorage
 
 
 class TestLedgerEntry:

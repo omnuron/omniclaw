@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from omniagentpay.onboarding import (
+from omniclaw.onboarding import (
     SetupError,
     create_env_file,
     generate_entity_secret,
@@ -95,7 +95,7 @@ class TestCreateEnvFile:
             )
 
             content = env_path.read_text()
-            assert "OMNIAGENTPAY_NETWORK=ARC" in content
+            assert "OMNICLAW_NETWORK=ARC" in content
 
 
 class TestVerifySetup:

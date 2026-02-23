@@ -1,5 +1,5 @@
 """
-Verification script for OmniAgentPay Core SDK.
+Verification script for OmniClaw Core SDK.
 Tests Client, Guards, Ledger, and Adapters integration.
 """
 
@@ -15,10 +15,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from omniagentpay import (  # noqa: E402
+from omniclaw import (  # noqa: E402
     BudgetGuard,
     Network,
-    OmniAgentPay,
+    OmniClaw,
     PaymentStatus,
     SingleTxGuard,
 )
@@ -28,7 +28,7 @@ async def main():
     print("🚀 Starting Core SDK Verification...")
 
     # 1. Initialize Client
-    print("\n📦 Initializing OmniAgentPay Client...")
+    print("\n📦 Initializing OmniClaw Client...")
     api_key = os.environ.get("CIRCLE_API_KEY")
     # entity_secret = os.environ.get("ENTITY_SECRET")
 
@@ -37,7 +37,7 @@ async def main():
         pass  # Client will handle it
 
     try:
-        client = OmniAgentPay(network=Network.ARC_TESTNET)
+        client = OmniClaw(network=Network.ARC_TESTNET)
         print("✅ Client initialized")
     except Exception as e:
         print(f"❌ Client initialization failed: {e}")

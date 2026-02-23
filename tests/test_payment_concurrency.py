@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omniagentpay.client import OmniAgentPay
-from omniagentpay.core.types import Network, PaymentResult, PaymentStatus
-from omniagentpay.guards.budget import BudgetGuard
-from omniagentpay.storage.memory import InMemoryStorage
+from omniclaw.client import OmniClaw
+from omniclaw.core.types import Network, PaymentResult, PaymentStatus
+from omniclaw.guards.budget import BudgetGuard
+from omniclaw.storage.memory import InMemoryStorage
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def client_with_storage():
     """Create a client with real in-memory storage for concurrency testing."""
     # We use real storage to test the locking/atomic mechanisms
     storage = InMemoryStorage()
-    client = OmniAgentPay(
+    client = OmniClaw(
         network=Network.ARC_TESTNET, circle_api_key="mock_key", entity_secret="mock_secret"
     )
     # Inject the storage into the guard manager

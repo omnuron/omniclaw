@@ -30,10 +30,10 @@ def mock_circle_client(monkeypatch):
         "transactionHash": "0xabc",
     }
 
-    # Patch the class in omniagentpay.core.circle_client
+    # Patch the class in omniclaw.core.circle_client
     # We patch it where it is imported/used, which is effectively the class definition
     with monkeypatch.context() as m:
         m.setattr(
-            "omniagentpay.core.circle_client.CircleClient", MagicMock(return_value=mock_client)
+            "omniclaw.core.circle_client.CircleClient", MagicMock(return_value=mock_client)
         )
         yield mock_client

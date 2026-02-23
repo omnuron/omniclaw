@@ -1,16 +1,16 @@
-# OmniAgentPay SDK - API Reference
+# OmniClaw SDK - API Reference
 
 > **Version:** 0.0.1  
 > **Last Updated:** 2026-01-18
 
-This document provides a comprehensive reference of all public methods, parameters, and return types in the OmniAgentPay SDK.
+This document provides a comprehensive reference of all public methods, parameters, and return types in the OmniClaw SDK.
 
 ---
 
 ## Table of Contents
 
 1. [Setup & Onboarding](#setup--onboarding)
-2. [Main Client (`OmniAgentPay`)](#main-client-omniagentpay)
+2. [Main Client (`OmniClaw`)](#main-client-omniclaw)
 3. [Wallet Management (`WalletService`)](#wallet-management-walletservice)
 4. [Guards (`GuardManager`)](#guards-guardmanager)
 5. [Ledger (`Ledger`)](#ledger-ledger)
@@ -36,7 +36,7 @@ Complete SDK setup in one call.
 
 **Example:**
 ```python
-from omniagentpay import quick_setup
+from omniclaw import quick_setup
 result = quick_setup("sk_test_...")
 ```
 
@@ -118,24 +118,24 @@ Search for an existing Circle recovery file.
 
 ### `get_config_dir()`
 
-Get the platform-specific config directory for OmniAgentPay.
+Get the platform-specific config directory for OmniClaw.
 
 **Parameters:** None
 
 **Returns:** `Path` - Path to config directory (created if doesn't exist)
-- Linux: `~/.config/omniagentpay/`
-- macOS: `~/Library/Application Support/omniagentpay/`
-- Windows: `%APPDATA%/omniagentpay/`
+- Linux: `~/.config/omniclaw/`
+- macOS: `~/Library/Application Support/omniclaw/`
+- Windows: `%APPDATA%/omniclaw/`
 
 ---
 
-## Main Client (`OmniAgentPay`)
+## Main Client (`OmniClaw`)
 
 The primary entry point for all SDK operations.
 
 ### `__init__(circle_api_key=None, entity_secret=None, network=Network.ARC_TESTNET, log_level=None)`
 
-Initialize OmniAgentPay client.
+Initialize OmniClaw client.
 
 **Parameters:**
 - `circle_api_key` (str | None, optional): Circle API key (or from `CIRCLE_API_KEY` env)
@@ -145,9 +145,9 @@ Initialize OmniAgentPay client.
 
 **Example:**
 ```python
-from omniagentpay import OmniAgentPay, Network
+from omniclaw import OmniClaw, Network
 
-client = OmniAgentPay(
+client = OmniClaw(
     circle_api_key="sk_...",
     entity_secret="...",
     network=Network.ARC_TESTNET
@@ -298,7 +298,7 @@ result = await client.pay(
 **Example (Cross-chain via CCTP):**
 ```python
 from decimal import Decimal
-from omniagentpay import Network
+from omniclaw import Network
 
 # Transfer from Base to Ethereum
 result = await client.pay(
@@ -1162,7 +1162,7 @@ def handle_webhook():
 
 All SDK methods may raise these exceptions:
 
-- `OmniAgentPayError`: Base exception for all SDK errors
+- `OmniClawError`: Base exception for all SDK errors
 - `ConfigurationError`: Configuration or setup errors
 - `WalletError`: Wallet operation errors
 - `PaymentError`: Payment execution errors
@@ -1176,10 +1176,10 @@ All SDK methods may raise these exceptions:
 
 **Example:**
 ```python
-from omniagentpay import OmniAgentPay, PaymentError, InsufficientBalanceError
+from omniclaw import OmniClaw, PaymentError, InsufficientBalanceError
 from decimal import Decimal
 
-client = OmniAgentPay()
+client = OmniClaw()
 
 try:
     result = await client.pay(
@@ -1198,7 +1198,7 @@ except PaymentError as e:
 ## Complete Usage Example
 
 ```python
-from omniagentpay import OmniAgentPay, quick_setup, BudgetGuard, Network
+from omniclaw import OmniClaw, quick_setup, BudgetGuard, Network
 from decimal import Decimal
 
 # One-time setup
@@ -1206,7 +1206,7 @@ quick_setup("YOUR_CIRCLE_API_KEY")
 
 # Initialize client
 async def main():
-    client = OmniAgentPay(
+    client = OmniClaw(
         network=Network.ARC_TESTNET,
         log_level="DEBUG"
     )
@@ -1256,5 +1256,5 @@ if __name__ == "__main__":
 
 **For more information, see:**
 - [SDK Usage Guide](SDK_USAGE_GUIDE.md)
-- [Vision Document](OMNIAGENTPAY_VISION.md)
+- [Vision Document](OMNICLAW_VISION.md)
 - [Main README](../README.md)

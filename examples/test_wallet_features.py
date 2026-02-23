@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +27,7 @@ logging.basicConfig(
 
 # Initialize client (reused across all tests)
 try:
-    client = OmniAgentPay(network=Network.ARC_TESTNET, log_level=logging.INFO)
+    client = OmniClaw(network=Network.ARC_TESTNET, log_level=logging.INFO)
 except Exception as e:
     print(f"\n[FAILED] Initialization Error: {e}")
     exit(1)
@@ -335,7 +335,7 @@ async def test_list_guards(wallet_id: str):
 async def run_all_tests():
     """Run all wallet management tests in sequence."""
     print("\n" + "#" * 60)
-    print("#  OMNIAGENTPAY WALLET MANAGEMENT TEST SUITE")
+    print("#  OMNICLAW WALLET MANAGEMENT TEST SUITE")
     print("#" * 60)
 
     try:
@@ -373,7 +373,7 @@ async def run_all_tests():
 def print_menu():
     """Print interactive menu."""
     print("\n" + "=" * 50)
-    print("OMNIAGENTPAY WALLET MANAGEMENT TESTER")
+    print("OMNICLAW WALLET MANAGEMENT TESTER")
     print("=" * 50)
     print("1. Create Wallet Set")
     print("2. List Wallet Sets")

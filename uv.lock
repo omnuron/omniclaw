@@ -1077,7 +1077,7 @@ wheels = [
 ]
 
 [[package]]
-name = "omniagentpay"
+name = "omniclaw"
 source = { editable = "." }
 dependencies = [
     { name = "circle-developer-controlled-wallets" },

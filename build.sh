@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# omniagentpay release build script
+# omniclaw release build script
 
-echo "🚀 Building OmniAgentPay for release..."
+echo "🚀 Building OmniClaw for release..."
 
 # 1. Clean previous builds
 echo "🧹 Cleaning up previous builds..."
@@ -31,6 +31,3 @@ echo ""
 echo "To publish to PyPI:"
 echo "  twine upload dist/*"
 echo ""
-echo "To create a release version via git tag:"
-echo "  git tag -a v0.1.0 -m 'Release v0.1.0'"
-echo "  git push origin v0.1.0"

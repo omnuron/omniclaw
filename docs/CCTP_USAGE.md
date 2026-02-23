@@ -2,11 +2,11 @@
 
 ## Basic Cross-Chain Payment
 ```python
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 from decimal import Decimal
 
-client = OmniAgentPay(
+client = OmniClaw(
     circle_api_key="sk_...",
     entity_secret="...",
     network=Network.ARC_TESTNET

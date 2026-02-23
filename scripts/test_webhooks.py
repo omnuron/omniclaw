@@ -9,14 +9,14 @@ sys.modules["circle.web3"] = MagicMock()
 os.environ["CIRCLE_API_KEY"] = "mock_key"
 os.environ["ENTITY_SECRET"] = "mock_secret"
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
-from omniagentpay.core.events import NotificationType  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
+from omniclaw.core.events import NotificationType  # noqa: E402
 
 
 def test_webhooks():
     print("=== Testing Webhook Parser (Parser-Only Architecture) ===")
 
-    client = OmniAgentPay(network=Network.ARC_TESTNET)
+    client = OmniClaw(network=Network.ARC_TESTNET)
 
     # Mock Payload (Circle Style)
     payload = {

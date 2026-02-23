@@ -12,20 +12,20 @@ from unittest.mock import MagicMock
 sys.modules["circle"] = MagicMock()
 sys.modules["circle.web3"] = MagicMock()
 
-from omniagentpay import OmniAgentPay  # noqa: E402
-from omniagentpay.core.types import (  # noqa: E402
+from omniclaw import OmniClaw  # noqa: E402
+from omniclaw.core.types import (  # noqa: E402
     FeeLevel,
     TransactionInfo,
     TransactionState,
 )
-from omniagentpay.ledger import LedgerEntry, LedgerEntryStatus  # noqa: E402
+from omniclaw.ledger import LedgerEntry, LedgerEntryStatus  # noqa: E402
 
 
 async def test_ledger_sync():
     print("\n=== Testing Ledger Sync ===")
 
     # Init client
-    client = OmniAgentPay(circle_api_key="mock", entity_secret="mock")
+    client = OmniClaw(circle_api_key="mock", entity_secret="mock")
 
     # 1. Create a dummy PENDING ledger entry manually
     # We cheat and use internal ledger to insert

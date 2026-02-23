@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from omniagentpay.core.config import Config
-from omniagentpay.core.types import (
+from omniclaw.core.config import Config
+from omniclaw.core.types import (
     Balance,
     Network,
     PaymentMethod,
@@ -15,9 +15,9 @@ from omniagentpay.core.types import (
     TransactionInfo,
     TransactionState,
 )
-from omniagentpay.payment.router import PaymentRouter
-from omniagentpay.protocols.transfer import TransferAdapter
-from omniagentpay.wallet.service import TransferResult
+from omniclaw.payment.router import PaymentRouter
+from omniclaw.protocols.transfer import TransferAdapter
+from omniclaw.wallet.service import TransferResult
 
 
 @pytest.fixture
@@ -160,7 +160,7 @@ class TestTransferAdapterExecute:
     ) -> None:
         """Test invalid address returns error."""
         # Mock wallet service to raise error for invalid address
-        from omniagentpay.core.exceptions import WalletError
+        from omniclaw.core.exceptions import WalletError
 
         mock_wallet_service.transfer.side_effect = WalletError("Invalid recipient address")
 

@@ -8,9 +8,9 @@ sys.modules["circle.web3"] = MagicMock()
 
 from decimal import Decimal  # noqa: E402
 
-from omniagentpay.guards.base import PaymentContext  # noqa: E402
-from omniagentpay.guards.budget import BudgetGuard  # noqa: E402
-from omniagentpay.storage.memory import InMemoryStorage  # noqa: E402
+from omniclaw.guards.base import PaymentContext  # noqa: E402
+from omniclaw.guards.budget import BudgetGuard  # noqa: E402
+from omniclaw.storage.memory import InMemoryStorage  # noqa: E402
 
 
 async def test_race():

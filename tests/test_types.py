@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from omniagentpay.core.types import (
+from omniclaw.core.types import (
     AccountType,
     Balance,
     CustodyType,

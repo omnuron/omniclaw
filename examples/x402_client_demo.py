@@ -18,8 +18,8 @@ project_root = Path(__file__).parent.parent
 load_dotenv(project_root / ".env")
 sys.path.insert(0, str(project_root / "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 # Configuration
@@ -39,7 +39,7 @@ async def main():
     print("🚀 x402 Client Demo Test")
     print("=" * 60)
     
-    client = OmniAgentPay(
+    client = OmniClaw(
         circle_api_key=api_key,
         entity_secret=entity_secret,
         network=Network.ARC_TESTNET,

@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from omniagentpay.core.config import Config
-from omniagentpay.core.types import Network
+from omniclaw.core.config import Config
+from omniclaw.core.types import Network
 
 
 class TestConfig:
@@ -68,8 +68,8 @@ class TestConfig:
         env_vars = {
             "CIRCLE_API_KEY": "env_api_key",
             "ENTITY_SECRET": "env_entity_secret",
-            "OMNIAGENTPAY_NETWORK": "ARC-TESTNET",
-            "OMNIAGENTPAY_DEFAULT_WALLET": "wallet-xyz",
+            "OMNICLAW_NETWORK": "ARC-TESTNET",
+            "OMNICLAW_DEFAULT_WALLET": "wallet-xyz",
         }
 
         with patch.dict(os.environ, env_vars, clear=False):

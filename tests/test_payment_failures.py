@@ -7,17 +7,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omniagentpay.client import OmniAgentPay
-from omniagentpay.core.exceptions import InsufficientBalanceError
-from omniagentpay.core.types import (
+from omniclaw.client import OmniClaw
+from omniclaw.core.exceptions import InsufficientBalanceError
+from omniclaw.core.types import (
     Network,
     PaymentResult,
     PaymentStatus,
 )
-from omniagentpay.payment.batch import BatchProcessor
-from omniagentpay.payment.router import PaymentRouter
-from omniagentpay.protocols.transfer import TransferAdapter
-from omniagentpay.wallet.service import TransferResult
+from omniclaw.payment.batch import BatchProcessor
+from omniclaw.payment.router import PaymentRouter
+from omniclaw.protocols.transfer import TransferAdapter
+from omniclaw.wallet.service import TransferResult
 
 # ----------------------------------------------------------------------
 # Fixtures
@@ -27,7 +27,7 @@ from omniagentpay.wallet.service import TransferResult
 @pytest.fixture
 def client_mocked():
     """Client with heavily mocked internals for verifying failure paths."""
-    client = OmniAgentPay(
+    client = OmniClaw(
         network=Network.ARC_TESTNET, circle_api_key="mock_key", entity_secret="mock_secret"
     )
     # Mock wallet service completely
@@ -124,7 +124,7 @@ async def test_pay_transfer_returns_failure_result(client_mocked):
 @pytest.mark.asyncio
 async def test_batch_pay_partial_failure(client_mocked):
     """Test batch payment where some succeed and some fail."""
-    from omniagentpay.core.types import PaymentRequest
+    from omniclaw.core.types import PaymentRequest
 
     # Use _router because router property is private
     target = client_mocked._router

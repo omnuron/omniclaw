@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-End-to-End Test Script for OmniAgentPay SDK.
+End-to-End Test Script for OmniClaw SDK.
 
 This script tests all WalletService functionality against the real Circle API.
 Make sure you have your .env file set up with:
@@ -17,9 +17,9 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from omniagentpay import Config, Network
-from omniagentpay.core.circle_client import CircleClient
-from omniagentpay.wallet.service import WalletService
+from omniclaw import Config, Network
+from omniclaw.core.circle_client import CircleClient
+from omniclaw.wallet.service import WalletService
 
 
 def print_header(title: str) -> None:
@@ -43,7 +43,7 @@ def test_ensure_setup(api_key: str | None = None):
     """Test 1: Ensure SDK is set up (auto-registers entity secret if needed)."""
     print_header("Test 1: Ensure Setup (Auto-Registration)")
 
-    from omniagentpay.onboarding import ensure_setup
+    from omniclaw.onboarding import ensure_setup
 
     try:
         # This will:
@@ -120,7 +120,7 @@ def test_wallet_set_operations(service: WalletService):
                 print(f"     ... and {len(wallet_sets) - 5} more")
 
         # Create new wallet set
-        test_name = "OmniAgentPay E2E Test"
+        test_name = "OmniClaw E2E Test"
         wallet_set = service.create_wallet_set(test_name)
         print_success(f"Created wallet set: {wallet_set.id}")
         # Note: Circle API for DeveloperWalletSet doesn't return 'name' field
@@ -280,8 +280,8 @@ def test_transfer_operations(service: WalletService, wallet):
 
         # Test 3: Test TransferResult properties
         print("\n  Testing TransferResult class...")
-        from omniagentpay.core.types import TransactionInfo, TransactionState
-        from omniagentpay.wallet.service import TransferResult
+        from omniclaw.core.types import TransactionInfo, TransactionState
+        from omniclaw.wallet.service import TransferResult
 
         # Create mock result to test properties
         mock_tx = TransactionInfo(id="test", state=TransactionState.PENDING)
@@ -395,7 +395,7 @@ def test_cache_operations(service: WalletService):
 def main(api_key: str | None = None):
     """Run all end-to-end tests."""
     print("\n" + "🚀" * 20)
-    print("   OmniAgentPay SDK - End-to-End Test")
+    print("   OmniClaw SDK - End-to-End Test")
     print("🚀" * 20)
 
     # Test 1: Ensure setup (auto-registers entity secret if needed)

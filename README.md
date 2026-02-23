@@ -1,19 +1,19 @@
-# OmniAgentPay
+# OmniClaw
 
 > **The Payment Execution Infrastructure for AI Agents**
 
-[![PyPI version](https://badge.fury.io/py/omniagentpay.svg)](https://badge.fury.io/py/omniagentpay)
+[![PyPI version](https://badge.fury.io/py/omniclaw.svg)](https://badge.fury.io/py/omniclaw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**OmniAgentPay** gives AI agents the ability to autonomously spend money—safely, instantly, and across any blockchain.
+**OmniClaw** gives AI agents the ability to autonomously spend money—safely, instantly, and across any blockchain.
 
 > 💡 *Think of it as Stripe for AI agents—except instead of helping merchants accept payments, we help agents make payments.*
 
 ---
 
-## 🔑 What is OmniAgentPay?
+## 🔑 What is OmniClaw?
 
-OmniAgentPay is a **developer SDK** that provides the complete payment infrastructure layer for autonomous AI agents:
+OmniClaw is a **developer SDK** that provides the complete payment infrastructure layer for autonomous AI agents:
 
 ### Core Capabilities
 
@@ -35,16 +35,16 @@ OmniAgentPay is a **developer SDK** that provides the complete payment infrastru
 
 ### The Buyer-Side Infrastructure
 
-OmniAgentPay complements payment protocols (x402, UCP, AP2) by providing the **execution logic**, **safety controls**, and **developer experience** that makes autonomous agent spending practical, safe, and observable.
+OmniClaw complements payment protocols (x402, UCP, AP2) by providing the **execution logic**, **safety controls**, and **developer experience** that makes autonomous agent spending practical, safe, and observable.
 
 ---
 
 ## ⚡ Get Started in 3 Lines
 
 ```python
-from omniagentpay import OmniAgentPay
+from omniclaw import OmniClaw
 
-client = OmniAgentPay()  # Reads CIRCLE_API_KEY from env
+client = OmniClaw()  # Reads CIRCLE_API_KEY from env
 result = await client.pay(wallet_id="...", recipient="0x...", amount=10.00)
 ```
 
@@ -52,13 +52,13 @@ result = await client.pay(wallet_id="...", recipient="0x...", amount=10.00)
 
 ---
 
-## 🎯 The OmniAgentPay Story
+## 🎯 The OmniClaw Story
 
 ### The Problem
 Traditional blockchain SDKs are designed for humans with screens, private keys, and confirmation buttons. When you give an AI agent a private key, you create a risk vector—hallucinations, prompt injection, or logic bugs can drain a treasury in seconds.
 
 ### The Solution  
-OmniAgentPay is **designed for code that thinks, reasons, and executes transactions autonomously**. We wrap every wallet in a **Safety Kernel** that:
+OmniClaw is **designed for code that thinks, reasons, and executes transactions autonomously**. We wrap every wallet in a **Safety Kernel** that:
 
 1. **Guards** check every payment against strict policies (Budget, Velocity, Whitelists)
 2. **Simulation** predicts the outcome and fees before signing
@@ -66,7 +66,7 @@ OmniAgentPay is **designed for code that thinks, reasons, and executes transacti
 
 ### What This Means For You
 
-| You Want To... | OmniAgentPay Does... |
+| You Want To... | OmniClaw Does... |
 |:---------------|:---------------------|
 | Send USDC to an address | `pay()` → Transfer Adapter handles it |
 | Pay an API that returns 402 | `pay()` → x402 Adapter negotiates, pays, retries |
@@ -112,7 +112,7 @@ OmniAgentPay is **designed for code that thinks, reasons, and executes transacti
 
 ## 💡 What Can You Build?
 
-OmniAgentPay is the engine for the **Agentic Economy**. Here are the winning use cases:
+OmniClaw is the engine for the **Agentic Economy**. Here are the winning use cases:
 
 ### 1. Trustless Autonomous Agents (Hackathon Track 🤖)
 Build agents that manage their own treasury without human oversight.
@@ -140,7 +140,7 @@ Agents that move capital instantly between chains.
 
 ## 🔌 The Three Payment Protocols
 
-OmniAgentPay automatically routes payments through the right protocol. You just call `pay()`—we handle the rest.
+OmniClaw automatically routes payments through the right protocol. You just call `pay()`—we handle the rest.
 
 ### 1. Transfer Adapter — Direct USDC Transfers
 **When**: Recipient is a blockchain address (`0x...` or Solana format)
@@ -173,7 +173,7 @@ result = await client.pay(
 **How it works:**
 1. Agent requests the URL
 2. Server returns `402 Payment Required` with price in headers
-3. OmniAgentPay pays the invoice automatically
+3. OmniClaw pays the invoice automatically
 4. Agent retries with payment proof, gets the data
 
 *Perfect for LLM wrappers, data APIs, or any usage-based service.*
@@ -198,7 +198,7 @@ result = await client.pay(
 
 ## 🏗 Core Architecture
 
-OmniAgentPay follows a **Hub-and-Spoke** architecture tailored for multi-agent systems.
+OmniClaw follows a **Hub-and-Spoke** architecture tailored for multi-agent systems.
 
 --
 
@@ -213,7 +213,7 @@ OmniAgentPay follows a **Hub-and-Spoke** architecture tailored for multi-agent s
                      │ uses
                      ▼
 ┌─────────────────────────────────────────────────┐
-│  🎯 OMNIAGENTPAY                                │
+│  🎯 OMNICLAW                                │
 │  Payment Execution Infrastructure               │
 │  • Wallets (Circle)    • Guards (Safety)        │
 │  • Router (x402, Transfer, Cross-Chain)         │
@@ -244,13 +244,13 @@ OmniAgentPay follows a **Hub-and-Spoke** architecture tailored for multi-agent s
 Install via pip:
 
 ```bash
-pip install omniagentpay
+pip install omniclaw
 ```
 
 Or using `uv` (recommended for speed):
 
 ```bash
-uv add omniagentpay
+uv add omniclaw
 ```
 
 **Requirements:**
@@ -268,17 +268,17 @@ The client automatically generates an Entity Secret if one is not provided, maki
 
 ```python
 import logging
-from omniagentpay import OmniAgentPay, Network
+from omniclaw import OmniClaw, Network
 
 # Reads CIRCLE_API_KEY from environment variables automatically
-client = OmniAgentPay(
+client = OmniClaw(
     network=Network.ARC_TESTNET,  # Defaults to ARC_TESTNET
     log_level=logging.INFO        # Use DEBUG for full request tracing
 )
 ```
 
 ### 2. Create an Identity
-Agents need wallets. In OmniAgentPay, we organize wallets into **Wallet Sets**.
+Agents need wallets. In OmniClaw, we organize wallets into **Wallet Sets**.
 
 ```python
 # Create a wallet specifically for "Agent-007"
@@ -333,7 +333,7 @@ except Exception as e:
 
 ## ⚙ Configuration Reference
 
-OmniAgentPay can be configured via Environment Variables or direct Constructor Arguments. **Environment Variables are recommended** for security.
+OmniClaw can be configured via Environment Variables or direct Constructor Arguments. **Environment Variables are recommended** for security.
 
 ### Environment Variables
 
@@ -341,15 +341,15 @@ OmniAgentPay can be configured via Environment Variables or direct Constructor A
 | :--- | :--- | :--- | :--- |
 | `CIRCLE_API_KEY` | **Yes** | Your API Key from Circle Console. | - |
 | `ENTITY_SECRET` | No | 32-byte hex secret for transaction signing. | **Auto-Generated** if missing |
-| `OMNIAGENTPAY_STORAGE_BACKEND` | No | Persistence layer: `memory` or `redis`. | `memory` |
-| `OMNIAGENTPAY_REDIS_URL` | No | Connection string if `redis` backend is used. | `redis://localhost:6379/0` |
-| `OMNIAGENTPAY_LOG_LEVEL` | No | `DEBUG`, `INFO`, `WARNING`, `ERROR`. | `INFO` |
-| `OMNIAGENTPAY_ENV` | No | `production` or `development`. | `development` |
+| `OMNICLAW_STORAGE_BACKEND` | No | Persistence layer: `memory` or `redis`. | `memory` |
+| `OMNICLAW_REDIS_URL` | No | Connection string if `redis` backend is used. | `redis://localhost:6379/0` |
+| `OMNICLAW_LOG_LEVEL` | No | `DEBUG`, `INFO`, `WARNING`, `ERROR`. | `INFO` |
+| `OMNICLAW_ENV` | No | `production` or `development`. | `development` |
 
-### Constructor Arguments (`OmniAgentPay`)
+### Constructor Arguments (`OmniClaw`)
 
 ```python
-client = OmniAgentPay(
+client = OmniClaw(
     circle_api_key="...",       # Optional if Env Var set
     entity_secret="...",        # Optional if Env Var set
     network=Network.ARC_TESTNET, # Target Blockchain Network
@@ -359,21 +359,21 @@ client = OmniAgentPay(
 
 ### Entity Secret Management
 
-The **Entity Secret** is a 32-byte private key required by Circle to sign wallet operations. OmniAgentPay handles this automatically, but understanding it helps with troubleshooting.
+The **Entity Secret** is a 32-byte private key required by Circle to sign wallet operations. OmniClaw handles this automatically, but understanding it helps with troubleshooting.
 
 #### How Auto-Setup Works
 
-When you initialize `OmniAgentPay` without an `ENTITY_SECRET`:
+When you initialize `OmniClaw` without an `ENTITY_SECRET`:
 
 1. SDK generates a new 32-byte secret
 2. Registers it with Circle API
-3. Saves a **recovery file** to `~/.config/omniagentpay/`
+3. Saves a **recovery file** to `~/.config/omniclaw/`
 4. Appends the secret to your `.env` file
 
 ```python
 # First run - auto-generates and registers entity secret
-from omniagentpay import OmniAgentPay
-client = OmniAgentPay()  # Reads CIRCLE_API_KEY from .env, generates ENTITY_SECRET
+from omniclaw import OmniClaw
+client = OmniClaw()  # Reads CIRCLE_API_KEY from .env, generates ENTITY_SECRET
 ```
 
 #### Recovery File Location
@@ -382,16 +382,16 @@ Recovery files are stored in a secure, platform-specific directory:
 
 | Platform | Location |
 |:---------|:---------|
-| Linux | `~/.config/omniagentpay/` |
-| macOS | `~/Library/Application Support/omniagentpay/` |
-| Windows | `%APPDATA%/omniagentpay/` |
+| Linux | `~/.config/omniclaw/` |
+| macOS | `~/Library/Application Support/omniclaw/` |
+| Windows | `%APPDATA%/omniclaw/` |
 
 You can find your config directory programmatically:
 
 ```python
-from omniagentpay import get_config_dir, find_recovery_file
+from omniclaw import get_config_dir, find_recovery_file
 
-print(get_config_dir())       # ~/.config/omniagentpay
+print(get_config_dir())       # ~/.config/omniclaw
 print(find_recovery_file())   # Path to recovery file, or None
 ```
 
@@ -413,7 +413,7 @@ For full details, see: [Circle Entity Secret Management](https://developers.circ
 
 ## Wallet Management
 
-OmniAgentPay organizes wallets into **Wallet Sets** to help you manage agent swarms and user wallets.
+OmniClaw organizes wallets into **Wallet Sets** to help you manage agent swarms and user wallets.
 
 ### Agent Wallets
 Best for autonomous agents. Creates a Wallet Set named `agent-{name}` and a wallet within it.
@@ -528,7 +528,7 @@ if not sim.would_succeed:
 
 ## 🛡 The Guard System (Safety Kernel)
 
-The **Guard System** is what makes OmniAgentPay unique. It is a programmable firewall for your agent's money.
+The **Guard System** is what makes OmniClaw unique. It is a programmable firewall for your agent's money.
 
 Guards are checked **Atomically**. This means checking a limit and updating the usage happens in a single, locked operation (using Redis Lua scripts or atomic memory locks), preventing race conditions even with high-concurrency agents.
 
@@ -612,7 +612,7 @@ await client.add_confirm_guard(
 ```
 
 ### Atomic Guarantees
-OmniAgentPay guarantees that **Checks** and **Effects** are atomic.
+OmniClaw guarantees that **Checks** and **Effects** are atomic.
 *   *Scenario*: 10 parallel requests of $10 arrive against a $50 budget.
 *   *Result*: Exactly 5 succeed. 5 fail with `BudgetExceeded`.
 *   *Mechanism*: Reservation tokens are issued during the check phase and committed only upon success. Failed transactions release the reservation.
@@ -664,7 +664,7 @@ await client.cancel_payment_intent(intent.id)
 Sending funds to 100 workers? Use `batch_pay`. It manages concurrency and result aggregation.
 
 ```python
-from omniagentpay import PaymentRequest
+from omniclaw import PaymentRequest
 
 # Build the manifest
 batch = [
@@ -690,7 +690,7 @@ for res in batch_result.results:
 
 ## 🎣 Webhooks & Events
 
-OmniAgentPay includes a **verifiable webhook parser**. If you use Circle's Notification Service, you can forward events to your agent securely.
+OmniClaw includes a **verifiable webhook parser**. If you use Circle's Notification Service, you can forward events to your agent securely.
 
 ### Supported Events
 *   `payment.received`: Funds landed in wallet.
@@ -724,7 +724,7 @@ async def handle_webhook(request: Request):
 
 ## 📊 Observability & Ledger
 
-Every transaction—whether successful, failed, or blocked by a guard—is recorded in the **OmniAgentPay Ledger**.
+Every transaction—whether successful, failed, or blocked by a guard—is recorded in the **OmniClaw Ledger**.
 
 ### The Ledger Schema
 The local ledger (Memory or Redis) acts as the "source of truth" for the agent's history, separate from the blockchain.
@@ -768,9 +768,9 @@ updated_entry = await client.sync_transaction(entry_id="entry_123")
 
 ## ⚠️ Error Handling
 
-OmniAgentPay uses a typed exception hierarchy rooted in `OmniAgentPayError`.
+OmniClaw uses a typed exception hierarchy rooted in `OmniClawError`.
 
-*   `OmniAgentPayError` (Base)
+*   `OmniClawError` (Base)
     *   `ConfigurationError`: Missing keys, bad config.
     *   `WalletError`: Wallet not found, invalid state.
     *   `PaymentError` transformation logic failure.

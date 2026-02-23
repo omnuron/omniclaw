@@ -14,8 +14,8 @@ sys.modules["circle.web3"] = MagicMock()
 sys.modules["circle.web3.developer_controlled_wallets"] = MagicMock()
 sys.modules["circle.web3.utils"] = MagicMock()
 
-from omniagentpay import OmniAgentPay  # noqa: E402
-from omniagentpay.core.types import (  # noqa: E402
+from omniclaw import OmniClaw  # noqa: E402
+from omniclaw.core.types import (  # noqa: E402
     PaymentIntentStatus,
     PaymentMethod,
     PaymentRequest,
@@ -29,7 +29,7 @@ async def test_payment_intents():
     print("\n=== Testing Payment Intents ===")
 
     # Initialize Client (Memory Storage by default)
-    client = OmniAgentPay(circle_api_key="mock_key", entity_secret="mock_secret")
+    client = OmniClaw(circle_api_key="mock_key", entity_secret="mock_secret")
 
     # Mock Router behaviors to avoid real API calls
     client._router.simulate = AsyncMock(
@@ -93,7 +93,7 @@ async def test_payment_intents():
 async def test_batch_payments():
     print("\n=== Testing Batch Payments ===")
 
-    client = OmniAgentPay(circle_api_key="mock_key", entity_secret="mock_secret")
+    client = OmniClaw(circle_api_key="mock_key", entity_secret="mock_secret")
 
     # Mock Router Pay
     async def mock_pay(wallet_id, recipient, amount, **kwargs):

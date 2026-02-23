@@ -13,13 +13,13 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from omniagentpay import OmniAgentPay
-from omniagentpay.core.types import Network
+from omniclaw import OmniClaw
+from omniclaw.core.types import Network
 
 
 async def main(api_key: str, entity_secret: str):
-    print("🏗️  Creating OmniAgentPay client...")
-    client = OmniAgentPay(
+    print("🏗️  Creating OmniClaw client...")
+    client = OmniClaw(
         circle_api_key=api_key,
         entity_secret=entity_secret,
     )

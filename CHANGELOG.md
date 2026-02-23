@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to OmniAgentPay will be documented in this file.
+All notable changes to OmniClaw will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Core Payment Infrastructure**
-  - `OmniAgentPay` client for autonomous AI agent payments
+  - `OmniClaw` client for autonomous AI agent payments
   - Developer-Controlled Wallets via Circle API integration
   - Universal payment routing (Transfer, x402, Cross-Chain)
   
@@ -65,4 +65,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Requires Python 3.10+
 - Requires Circle Web3 Services API key
 
-[0.0.2]: https://github.com/omniagentpay/omniagentpay/releases/tag/v0.0.2
+[0.0.2]: https://github.com/omniclaw/omniclaw/releases/tag/v0.0.2

@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from omniagentpay import (  # noqa: E402
+from omniclaw import (  # noqa: E402
     Network,
-    OmniAgentPay,
+    OmniClaw,
     PaymentStatus,
 )
 
@@ -27,10 +27,10 @@ async def main():
     4. RateLimitGuard - Limit payment frequency
     5. ConfirmGuard - Require confirmation for large payments
     """
-    print("=== OmniAgentPay Guards Example ===\n")
+    print("=== OmniClaw Guards Example ===\n")
 
     # Initialize client
-    client = OmniAgentPay(network=Network.ARC_TESTNET)
+    client = OmniClaw(network=Network.ARC_TESTNET)
 
     # Create a demo wallet (or use existing)
     # In production, you'd reuse an existing wallet

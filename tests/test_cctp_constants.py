@@ -3,8 +3,8 @@ Test suite for CCTP constants and utilities.
 """
 
 import pytest
-from omniagentpay.core.types import Network
-from omniagentpay.core.cctp_constants import (
+from omniclaw.core.types import Network
+from omniclaw.core.cctp_constants import (
     CCTP_DOMAIN_IDS,
     TOKEN_MESSENGER_V2_CONTRACTS,
     MESSAGE_TRANSMITTER_V2_CONTRACTS,

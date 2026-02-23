@@ -11,12 +11,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from omniagentpay import (  # noqa: E402
+from omniclaw import (  # noqa: E402
     Network,
-    OmniAgentPay,
+    OmniClaw,
     SingleTxGuard,
 )
-from omniagentpay.ledger import LedgerEntryStatus  # noqa: E402
+from omniclaw.ledger import LedgerEntryStatus  # noqa: E402
 
 
 async def main():
@@ -26,10 +26,10 @@ async def main():
     2. Querying transaction history
     3. Tracking blocked vs completed payments
     """
-    print("=== OmniAgentPay Ledger Example ===\n")
+    print("=== OmniClaw Ledger Example ===\n")
 
     # Initialize client
-    client = OmniAgentPay(network=Network.ARC_TESTNET)
+    client = OmniClaw(network=Network.ARC_TESTNET)
     client.set_default_wallet("demo-wallet-id")
 
     # Add a guard to block some payments

@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from omniagentpay.guards.base import PaymentContext
-from omniagentpay.guards.budget import BudgetGuard
-from omniagentpay.guards.single_tx import SingleTxGuard
+from omniclaw.guards.base import PaymentContext
+from omniclaw.guards.budget import BudgetGuard
+from omniclaw.guards.single_tx import SingleTxGuard
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ style = "pep440"
 bump = true
 
 [project]
-name = "omniagentpay"
+name = "omniclaw"
 dynamic = ["version"]
 description = "The Payment Infrastructure Layer for Autonomous AI Agents"
 readme = "README.md"
@@ -70,17 +70,17 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/omniagentpay/omniagentpay"
-Documentation = "https://omniagentpay.dev/docs"
-Repository = "https://github.com/omniagentpay/omniagentpay"
+Homepage = "https://github.com/omniclaw/omniclaw"
+Documentation = "https://omniclaw.dev/docs"
+Repository = "https://github.com/omniclaw/omniclaw"
 
 
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/omniagentpay"]
+packages = ["src/omniclaw"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/omniagentpay"]
+include = ["src/omniclaw"]
 
 [tool.hatch.build]
 sources = ["src"]

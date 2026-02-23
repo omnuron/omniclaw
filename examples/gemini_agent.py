@@ -1,7 +1,7 @@
 """
-Example: Gemini Agent with OmniAgentPay
+Example: Gemini Agent with OmniClaw
 ---------------------------------------
-Demonstrates how to integrate OmniAgentPay with Google's Gemini models
+Demonstrates how to integrate OmniClaw with Google's Gemini models
 using Function Calling to enable autonomous agentic payments on Arc.
 
 Targeting: "Best use of Gemini" & "Best Trustless AI Agent" tracks.
@@ -19,7 +19,7 @@ except ImportError:
     print("⚠️  google-generativeai not installed. This is a code example.")
     genai = None
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -37,9 +37,9 @@ async def pay_tool(recipient: str, amount: str, purpose: str = "Payment") -> dic
     """
     logger.info(f"🤖 Agent invoking pay_tool: {amount} USDC -> {recipient}")
 
-    # Initialize OmniAgentPay (Auto-config from env)
+    # Initialize OmniClaw (Auto-config from env)
     # Using Arc Testnet for Hackathon
-    async with OmniAgentPay(network=Network.ARC_TESTNET) as client:
+    async with OmniClaw(network=Network.ARC_TESTNET) as client:
         # 1. Get Wallet (Simulation)
         # In prod, you'd load the specific agent's wallet
         wallets = await client.list_wallets()

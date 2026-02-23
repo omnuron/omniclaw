@@ -12,11 +12,11 @@ sys.modules["circle.web3.developer_controlled_wallets"] = mock_circle
 sys.modules["circle.web3.utils"] = mock_circle
 
 # Add src to path if running from root
-sys.path.append(os.path.abspath("omniagentpay/src"))
+sys.path.append(os.path.abspath("omniclaw/src"))
 
-from omniagentpay import OmniAgentPay  # noqa: E402
-from omniagentpay.core.types import TransactionInfo, TransactionState  # noqa: E402
-from omniagentpay.wallet.service import TransferResult  # noqa: E402
+from omniclaw import OmniClaw  # noqa: E402
+from omniclaw.core.types import TransactionInfo, TransactionState  # noqa: E402
+from omniclaw.wallet.service import TransferResult  # noqa: E402
 
 
 async def main():
@@ -24,7 +24,7 @@ async def main():
 
     # 1. Initialize Client (with mocks where needed)
     # We mock the wallet service's transfer method to avoid needing real funds/keys
-    client = OmniAgentPay(circle_api_key="sk_test_mock", entity_secret="mock_secret")
+    client = OmniClaw(circle_api_key="sk_test_mock", entity_secret="mock_secret")
 
     # Mock the transfer method to return success immediately
     mock_tx = TransactionInfo(
@@ -49,7 +49,7 @@ async def main():
     # Since we can't easily reach into the client's private adapter list from outside without knowing implementation details,
     # we'll use unittest.mock.patch on the class method for this run context.
 
-    from omniagentpay.wallet.service import WalletService
+    from omniclaw.wallet.service import WalletService
 
     # We'll create a dummy wallet for the "get_wallet" call too
     mock_wallet = MagicMock()

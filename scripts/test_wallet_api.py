@@ -9,8 +9,8 @@ sys.modules["circle.web3"] = MagicMock()
 os.environ["CIRCLE_API_KEY"] = "sk_test_mock"
 os.environ["ENTITY_SECRET"] = "mock_secret"
 
-from omniagentpay import Network, OmniAgentPay  # noqa: E402
-from omniagentpay.core.types import (  # noqa: E402
+from omniclaw import Network, OmniClaw  # noqa: E402
+from omniclaw.core.types import (  # noqa: E402
     AccountType,
     CustodyType,
     WalletInfo,
@@ -23,7 +23,7 @@ async def test_wallet_api():
     print("=== Testing Wallet API Facade ===")
 
     # Init Client
-    client = OmniAgentPay(network=Network.ARC_TESTNET)
+    client = OmniClaw(network=Network.ARC_TESTNET)
 
     # Mock WalletService methods
     client._wallet_service.create_wallet = MagicMock(

@@ -1,5 +1,5 @@
 """
-Unit tests for OmniAgentPay Client (Multi-tenant).
+Unit tests for OmniClaw Client (Multi-tenant).
 
 Tests the main SDK entry point with per-wallet/wallet-set guards.
 """
@@ -10,14 +10,14 @@ from unittest.mock import patch
 
 import pytest
 
-from omniagentpay.client import GuardManager, OmniAgentPay
-from omniagentpay.core.types import (
+from omniclaw.client import GuardManager, OmniClaw
+from omniclaw.core.types import (
     Network,
     PaymentMethod,
     PaymentStatus,
 )
-from omniagentpay.guards.budget import BudgetGuard
-from omniagentpay.guards.single_tx import SingleTxGuard
+from omniclaw.guards.budget import BudgetGuard
+from omniclaw.guards.single_tx import SingleTxGuard
 
 
 @pytest.fixture
@@ -34,16 +34,16 @@ def mock_env():
 
 
 @pytest.fixture
-def client(mock_env) -> OmniAgentPay:
+def client(mock_env) -> OmniClaw:
     """Create client with mocked environment."""
-    return OmniAgentPay(network=Network.ARC_TESTNET)
+    return OmniClaw(network=Network.ARC_TESTNET)
 
 
 class TestClientInitialization:
     """Tests for client initialization."""
 
     def test_init_with_explicit_credentials(self):
-        client = OmniAgentPay(
+        client = OmniClaw(
             circle_api_key="explicit_key",
             entity_secret="explicit_secret",
             network=Network.ARC_TESTNET,
@@ -52,12 +52,12 @@ class TestClientInitialization:
         assert client.config.network == Network.ARC_TESTNET
 
     def test_init_with_env_vars(self, mock_env):
-        client = OmniAgentPay()
+        client = OmniClaw()
         assert client.config.circle_api_key == "test_api_key"
 
     def test_init_no_default_wallet(self, mock_env):
         """Multi-tenant: no default_wallet_id parameter."""
-        client = OmniAgentPay()
+        client = OmniClaw()
         # No default wallet - must provide wallet_id on each operation
         assert not hasattr(client, "_default_wallet_id") or client._default_wallet_id is None
 
@@ -67,7 +67,7 @@ class TestGuardManager:
 
     @pytest.mark.asyncio
     async def test_add_guard_for_wallet(self):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         gm = GuardManager(storage)
@@ -80,7 +80,7 @@ class TestGuardManager:
 
     @pytest.mark.asyncio
     async def test_add_guard_for_wallet_set(self):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         gm = GuardManager(storage)
@@ -93,7 +93,7 @@ class TestGuardManager:
 
     @pytest.mark.asyncio
     async def test_remove_guard_from_wallet(self):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         gm = GuardManager(storage)
@@ -107,7 +107,7 @@ class TestGuardManager:
 
     @pytest.mark.asyncio
     async def test_get_combined_guard_chain(self):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         gm = GuardManager(storage)
@@ -126,7 +126,7 @@ class TestGuardManager:
 
     @pytest.mark.asyncio
     async def test_list_guard_names(self):
-        from omniagentpay.storage.memory import InMemoryStorage
+        from omniclaw.storage.memory import InMemoryStorage
 
         storage = InMemoryStorage()
         gm = GuardManager(storage)
@@ -167,7 +167,7 @@ class TestLedgerProperty:
 
     @pytest.mark.asyncio
     async def test_ledger_records_entries(self, client):
-        from omniagentpay.ledger import LedgerEntry
+        from omniclaw.ledger import LedgerEntry
 
         entry = LedgerEntry(
             wallet_id="w1",
@@ -271,7 +271,7 @@ class TestPayBlocked:
         entries = await client.ledger.query(wallet_id="wallet-123", limit=1)
         assert len(entries) == 1
 
-        from omniagentpay.ledger import LedgerEntryStatus
+        from omniclaw.ledger import LedgerEntryStatus
 
         assert entries[0].status == LedgerEntryStatus.BLOCKED
 
@@ -281,7 +281,7 @@ class TestPayRequiresWallet:
 
     @pytest.mark.asyncio
     async def test_pay_empty_wallet_raises(self, client):
-        from omniagentpay.core.exceptions import ValidationError
+        from omniclaw.core.exceptions import ValidationError
 
         with pytest.raises(ValidationError):
             await client.pay(

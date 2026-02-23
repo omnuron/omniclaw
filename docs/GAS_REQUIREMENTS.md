@@ -1,5 +1,5 @@
 """
-Gas Requirements Documentation for OmniAgentPay Networks
+Gas Requirements Documentation for OmniClaw Networks
 
 This document outlines the gas token requirements for each supported network.
 """

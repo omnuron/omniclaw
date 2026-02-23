@@ -4,8 +4,8 @@ Test suite for gas estimation utilities.
 
 import pytest
 from decimal import Decimal
-from omniagentpay.core.types import Network
-from omniagentpay.utils.gas import (
+from omniclaw.core.types import Network
+from omniclaw.utils.gas import (
     get_network_gas_token,
     check_gas_requirements,
     estimate_cctp_gas_cost,

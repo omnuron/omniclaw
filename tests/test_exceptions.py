@@ -2,14 +2,14 @@
 
 from decimal import Decimal
 
-from omniagentpay.core.exceptions import (
+from omniclaw.core.exceptions import (
     ConfigurationError,
     CrosschainError,
     GuardError,
     IdempotencyError,
     InsufficientBalanceError,
     NetworkError,
-    OmniAgentPayError,
+    OmniClawError,
     PaymentError,
     TransactionTimeoutError,
     WalletError,
@@ -17,12 +17,12 @@ from omniagentpay.core.exceptions import (
 )
 
 
-class TestOmniAgentPayError:
+class TestOmniClawError:
     """Tests for base exception."""
 
     def test_basic_error(self) -> None:
         """Test basic error creation."""
-        error = OmniAgentPayError("Something went wrong")
+        error = OmniClawError("Something went wrong")
 
         assert str(error) == "Something went wrong"
         assert error.message == "Something went wrong"
@@ -30,7 +30,7 @@ class TestOmniAgentPayError:
 
     def test_error_with_details(self) -> None:
         """Test error with details dict."""
-        error = OmniAgentPayError(
+        error = OmniClawError(
             "API failed",
             details={"status_code": 500, "response": "Internal error"},
         )
@@ -43,7 +43,7 @@ class TestOmniAgentPayError:
         """Test that specific errors can be caught as base type."""
         try:
             raise WalletError("Wallet not found")
-        except OmniAgentPayError as e:
+        except OmniClawError as e:
             assert "Wallet not found" in str(e)
 
 
@@ -54,7 +54,7 @@ class TestConfigurationError:
         """Test configuration error creation."""
         error = ConfigurationError("Missing API key")
 
-        assert isinstance(error, OmniAgentPayError)
+        assert isinstance(error, OmniClawError)
         assert "Missing API key" in str(error)
 
 
@@ -69,7 +69,7 @@ class TestWalletError:
         )
 
         assert error.wallet_id == "wallet-123"
-        assert isinstance(error, OmniAgentPayError)
+        assert isinstance(error, OmniClawError)
 
 
 class TestPaymentError:
@@ -274,7 +274,7 @@ class TestExceptionHierarchy:
     """Tests for exception inheritance."""
 
     def test_all_errors_inherit_from_base(self) -> None:
-        """Test all errors inherit from OmniAgentPayError."""
+        """Test all errors inherit from OmniClawError."""
         errors = [
             ConfigurationError("test"),
             WalletError("test"),
@@ -289,7 +289,7 @@ class TestExceptionHierarchy:
         ]
 
         for error in errors:
-            assert isinstance(error, OmniAgentPayError)
+            assert isinstance(error, OmniClawError)
 
     def test_payment_errors_inherit_correctly(self) -> None:
         """Test payment error hierarchy."""

@@ -5,8 +5,8 @@ Test suite for x402 protocol implementation.
 import pytest
 from decimal import Decimal
 from unittest.mock import Mock, AsyncMock, patch
-from omniagentpay.core.types import Network, PaymentMethod, PaymentStatus
-from omniagentpay.protocols.x402 import (
+from omniclaw.core.types import Network, PaymentMethod, PaymentStatus
+from omniclaw.protocols.x402 import (
     X402Adapter,
     PaymentRequirements,
     PaymentPayload,
@@ -141,7 +141,7 @@ class TestX402Adapter:
             mock_request.return_value = (mock_response, mock_requirements)
             
             # Should detect cross-chain and use GatewayAdapter
-            with patch('omniagentpay.protocols.gateway.GatewayAdapter') as mock_gateway:
+            with patch('omniclaw.protocols.gateway.GatewayAdapter') as mock_gateway:
                 mock_gateway_instance = Mock()
                 mock_gateway_instance.execute = AsyncMock(return_value=Mock(
                     success=True,

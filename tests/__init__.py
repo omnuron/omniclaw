@@ -1,1 +1,1 @@
-"""Tests package for OmniAgentPay SDK."""
+"""Tests package for OmniClaw SDK."""

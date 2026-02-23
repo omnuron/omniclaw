@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from omniagentpay.core.config import Config
-from omniagentpay.core.exceptions import InsufficientBalanceError, WalletError
-from omniagentpay.core.types import (
+from omniclaw.core.config import Config
+from omniclaw.core.exceptions import InsufficientBalanceError, WalletError
+from omniclaw.core.types import (
     AccountType,
     Balance,
     CustodyType,
@@ -19,7 +19,7 @@ from omniagentpay.core.types import (
     WalletSetInfo,
     WalletState,
 )
-from omniagentpay.wallet.service import TransferResult, WalletService
+from omniclaw.wallet.service import TransferResult, WalletService
 
 
 @pytest.fixture

@@ -3,12 +3,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from omniagentpay.core.config import Config
-from omniagentpay.core.types import Network, PaymentMethod
-from omniagentpay.payment.router import PaymentRouter
-from omniagentpay.protocols.gateway import GatewayAdapter
-from omniagentpay.protocols.transfer import TransferAdapter
-from omniagentpay.protocols.x402 import X402Adapter
+from omniclaw.core.config import Config
+from omniclaw.core.types import Network, PaymentMethod
+from omniclaw.payment.router import PaymentRouter
+from omniclaw.protocols.gateway import GatewayAdapter
+from omniclaw.protocols.transfer import TransferAdapter
+from omniclaw.protocols.x402 import X402Adapter
 
 
 @pytest.fixture
