@@ -33,6 +33,7 @@ from omniclaw.guards.base import PaymentContext
 from omniclaw.guards.manager import GuardManager
 from omniclaw.intents.service import PaymentIntentService
 from omniclaw.ledger import Ledger, LedgerEntry, LedgerEntryStatus
+from omniclaw.ledger.lock import FundLockService
 from omniclaw.payment.batch import BatchProcessor
 from omniclaw.payment.router import PaymentRouter
 from omniclaw.protocols.gateway import GatewayAdapter
@@ -113,6 +114,7 @@ class OmniClaw:
 
         self._storage = get_storage()
         self._ledger = Ledger(self._storage)
+        self._fund_lock = FundLockService(self._storage)
         self._guard_manager = GuardManager(self._storage)
         self._circle_client = CircleClient(self._config)
 
@@ -305,6 +307,7 @@ class OmniClaw:
                 wallet_id=wallet_id, wallet_set_id=wallet_set_id
             )
             try:
+                # Reserve budget/limits first (atomic counters)
                 reservation_tokens = await guards_chain.reserve(context)
                 guards_passed = [g.name for g in guards_chain]
             except ValueError as e:
@@ -326,12 +329,27 @@ class OmniClaw:
                     metadata={"guard_reason": str(e)},
                 )
 
-        # Resilience Shell
-        circuit = self._circuit_breakers.get("circle_api")  # Default to Circle API for now
-        if not circuit:
-             circuit = self._circuit_breakers["default"]
+        # Acquire Fund Lock (Mutex) to prevent double-spend race conditions
+        lock_key = await self._fund_lock.acquire(wallet_id, amount_decimal)
+        if not lock_key:
+             # Could not acquire lock (busy)
+             error_msg = "Wallet is busy (locked by another transaction). Please retry."
+             if guards_chain and reservation_tokens:
+                 await guards_chain.release(reservation_tokens)
+             
+             await self._ledger.update_status(
+                 ledger_entry.id, 
+                 LedgerEntryStatus.FAILED, 
+                 error=error_msg
+             )
+             raise PaymentError(error_msg)
 
         try:
+            # Resilience Shell
+            circuit = self._circuit_breakers.get("circle_api")  # Default to Circle API for now
+            if not circuit:
+                 circuit = self._circuit_breakers["default"]
+
             # 1. Check Circuit
             if not await circuit.is_available():
                 if strategy == PaymentStrategy.QUEUE_BACKGROUND:
@@ -406,6 +424,10 @@ class OmniClaw:
 
             await self._ledger.update_status(ledger_entry.id, LedgerEntryStatus.FAILED, error=str(e))
             raise e
+        finally:
+            # Release lock in all cases
+            if lock_key:
+                await self._fund_lock.release(lock_key)
 
     async def _queue_payment(
         self,

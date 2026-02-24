@@ -117,15 +117,59 @@ class RedisStorage(StorageBackend):
     ) -> str:
         """Atomically add amount."""
         client = self._get_client()
+        # Ensure we use the collection prefix for atomic counters too
+        # But wait, _make_key uses collection + key
         redis_key = self._make_key(collection, key)
 
         # INCRBYFLOAT is atomic
+        # Note: Redis stores this as string
         new_val = await client.incrbyfloat(redis_key, float(amount))
-
-        # Add to index so it can be cleared/counted
-        await client.sadd(f"{self._prefix}:{collection}:_index", key)
+        
+        # Add to index? Atomic counters might be separate from JSON docs.
+        # Existing implementation adds to index. Let's keep it.
+        # But wait, query() expects JSON. 
+        # get() handles non-JSON fallback. So this is fine.
+        index_key = f"{self._prefix}:{collection}:_index"
+        await client.sadd(index_key, key)
 
         return str(new_val)
+
+    async def acquire_lock(
+        self,
+        key: str,
+        ttl: int = 30,
+    ) -> bool:
+        """
+        Acquire a distributed lock (Redis SET NX).
+
+        Args:
+            key: Lock key (e.g. "lock:wallet:123")
+            ttl: TTL in seconds
+
+        Returns:
+            True if acquired
+        """
+        client = self._get_client()
+        # Use a dedicated lock prefix to avoid collision with collections
+        redis_key = f"{self._prefix}:locks:{key}"
+        
+        # SET key value NX EX ttl
+        # value="1" is arbitrary
+        result = await client.set(redis_key, "1", nx=True, ex=ttl)
+        return bool(result)
+
+    async def release_lock(
+        self,
+        key: str,
+    ) -> bool:
+        """Release a lock."""
+        client = self._get_client()
+        redis_key = f"{self._prefix}:locks:{key}"
+        
+        # Simple delete. 
+        # In a strict mutex, we'd check ownership, but here we trust the caller.
+        result = await client.delete(redis_key)
+        return result > 0
 
     async def query(
         self,

@@ -164,6 +164,40 @@ class StorageBackend(ABC):
         """
         ...
 
+    @abstractmethod
+    async def acquire_lock(
+        self,
+        key: str,
+        ttl: int = 30,
+    ) -> bool:
+        """
+        Acquire a distributed lock.
+
+        Args:
+            key: Lock key (unique resource identifier)
+            ttl: Time-to-live in seconds (lock auto-release)
+
+        Returns:
+            True if lock acquired, False if already held
+        """
+        ...
+
+    @abstractmethod
+    async def release_lock(
+        self,
+        key: str,
+    ) -> bool:
+        """
+        Release a distributed lock.
+
+        Args:
+            key: Lock key
+
+        Returns:
+            True if lock released, False if not found
+        """
+        ...
+
     async def health_check(self) -> bool:
         """
         Check if storage is healthy and connected.
