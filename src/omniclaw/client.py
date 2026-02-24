@@ -23,6 +23,7 @@ from omniclaw.core.types import (
     PaymentRequest,
     PaymentResult,
     PaymentStatus,
+    PaymentStrategy,
     SimulationResult,
     TransactionInfo,
     WalletInfo,
@@ -37,6 +38,8 @@ from omniclaw.payment.router import PaymentRouter
 from omniclaw.protocols.gateway import GatewayAdapter
 from omniclaw.protocols.transfer import TransferAdapter
 from omniclaw.protocols.x402 import X402Adapter
+from omniclaw.resilience.circuit import CircuitBreaker, CircuitOpenError
+from omniclaw.resilience.retry import execute_with_retry
 from omniclaw.storage import get_storage
 from omniclaw.wallet.service import WalletService
 from omniclaw.webhooks import WebhookParser
@@ -126,6 +129,12 @@ class OmniClaw:
         self._intent_service = PaymentIntentService(self._storage)
         self._batch_processor = BatchProcessor(self._router)
         self._webhook_parser = WebhookParser()
+
+        # Initialize Resilience
+        self._circuit_breakers = {
+            "default": CircuitBreaker("default", self._storage),
+            "circle_api": CircuitBreaker("circle_api", self._storage),
+        }
 
     @property
     def config(self) -> Config:
@@ -227,6 +236,7 @@ class OmniClaw:
         purpose: str | None = None,
         idempotency_key: str | None = None,
         fee_level: FeeLevel = FeeLevel.MEDIUM,
+        strategy: PaymentStrategy = PaymentStrategy.RETRY_THEN_FAIL,
         skip_guards: bool = False,
         metadata: dict[str, Any] | None = None,
         wait_for_completion: bool = False,
@@ -234,8 +244,8 @@ class OmniClaw:
         **kwargs: Any,
     ) -> PaymentResult:
         """
-        Execute a payment with automatic routing (Transfer, x402, or Gateway) and guard checks.
-        
+        Execute a payment with automatic routing, guards, and resilience.
+
         Args:
             wallet_id: Source wallet ID (REQUIRED)
             recipient: Payment recipient (address or URL)
@@ -245,14 +255,13 @@ class OmniClaw:
             purpose: Human-readable purpose
             idempotency_key: Unique key for deduplication
             fee_level: Transaction fee level
+            strategy: Reliability strategy (FAIL_FAST, RETRY_THEN_FAIL, QUEUE_BACKGROUND)
             skip_guards: Skip guard checks (dangerous!)
             metadata: Additional metadata
             wait_for_completion: Wait for transaction confirmation
             timeout_seconds: Maximum wait time
-            **kwargs: Additional options including:
-                - use_fast_transfer (bool): Use CCTP Fast Transfer (~2-5s) vs Standard (~13-19m). Default: True
-                - source_network (Network): Override source network detection
-        
+            **kwargs: Additional options
+
         Returns:
             PaymentResult with transaction details
         """
@@ -267,6 +276,7 @@ class OmniClaw:
 
         meta = metadata or {}
         meta["idempotency_key"] = idempotency_key
+        meta["strategy"] = strategy.value
 
         context = PaymentContext(
             wallet_id=wallet_id,
@@ -282,7 +292,7 @@ class OmniClaw:
             recipient=recipient,
             amount=amount_decimal,
             purpose=purpose,
-            metadata=metadata or {},
+            metadata=meta,
         )
         await self._ledger.record(ledger_entry)
 
@@ -303,7 +313,6 @@ class OmniClaw:
                     LedgerEntryStatus.BLOCKED,
                     tx_hash=None,
                 )
-
                 return PaymentResult(
                     success=False,
                     transaction_id=None,
@@ -317,21 +326,56 @@ class OmniClaw:
                     metadata={"guard_reason": str(e)},
                 )
 
-        try:
-            result = await self._router.pay(
-                wallet_id=wallet_id,
-                recipient=recipient,
-                amount=amount_decimal,
-                purpose=purpose,
-                guards_passed=guards_passed,
-                fee_level=fee_level,
-                idempotency_key=idempotency_key,
-                destination_chain=destination_chain,
-                wait_for_completion=wait_for_completion,
-                timeout_seconds=timeout_seconds,
-                **kwargs,
-            )
+        # Resilience Shell
+        circuit = self._circuit_breakers.get("circle_api")  # Default to Circle API for now
+        if not circuit:
+             circuit = self._circuit_breakers["default"]
 
+        try:
+            # 1. Check Circuit
+            if not await circuit.is_available():
+                if strategy == PaymentStrategy.QUEUE_BACKGROUND:
+                    # Queue it
+                    return await self._queue_payment(context, ledger_entry.id, guards_chain, reservation_tokens)
+                
+                # Fail Fast / Retry logic implies fail if circuit open
+                recovery_ts = await circuit.get_recovery_ts() if hasattr(circuit, "get_recovery_ts") else 0
+                raise CircuitOpenError(circuit.service, recovery_ts)
+
+            # 2. Execute with Strategy
+            async with circuit:
+                if strategy == PaymentStrategy.RETRY_THEN_FAIL:
+                    result = await execute_with_retry(
+                        self._router.pay,
+                        wallet_id=wallet_id,
+                        recipient=recipient,
+                        amount=amount_decimal,
+                        purpose=purpose,
+                        guards_passed=guards_passed,
+                        fee_level=fee_level,
+                        idempotency_key=idempotency_key,
+                        destination_chain=destination_chain,
+                        wait_for_completion=wait_for_completion,
+                        timeout_seconds=timeout_seconds,
+                        **kwargs,
+                    )
+                else:
+                    # FAIL_FAST or QUEUE_BACKGROUND (attempt once)
+                    result = await self._router.pay(
+                        wallet_id=wallet_id,
+                        recipient=recipient,
+                        amount=amount_decimal,
+                        purpose=purpose,
+                        guards_passed=guards_passed,
+                        fee_level=fee_level,
+                        idempotency_key=idempotency_key,
+                        destination_chain=destination_chain,
+                        wait_for_completion=wait_for_completion,
+                        timeout_seconds=timeout_seconds,
+                        **kwargs,
+                    )
+
+            # 3. Success Handling
             if result.success:
                 await self._ledger.update_status(
                     ledger_entry.id,
@@ -341,28 +385,72 @@ class OmniClaw:
                     result.blockchain_tx,
                     metadata_updates={"transaction_id": result.transaction_id},
                 )
-
                 if guards_chain:
                     await guards_chain.commit(reservation_tokens)
             else:
-                await self._ledger.update_status(
-                    ledger_entry.id,
-                    LedgerEntryStatus.FAILED,
-                )
+                await self._ledger.update_status(ledger_entry.id, LedgerEntryStatus.FAILED)
                 if guards_chain:
                     await guards_chain.release(reservation_tokens)
 
             return result
 
-        except Exception:
+        except Exception as e:
+            # 4. Failure Handling & Queueing
+            if strategy == PaymentStrategy.QUEUE_BACKGROUND:
+                self._logger.warning(f"Payment failed ({e}), queueing background retry.")
+                return await self._queue_payment(context, ledger_entry.id, guards_chain, reservation_tokens)
+            
+            # Release guards on final failure
             if guards_chain:
                 await guards_chain.release(reservation_tokens)
 
-            await self._ledger.update_status(
-                ledger_entry.id,
-                LedgerEntryStatus.FAILED,
-            )
-            raise
+            await self._ledger.update_status(ledger_entry.id, LedgerEntryStatus.FAILED, error=str(e))
+            raise e
+
+    async def _queue_payment(
+        self,
+        context: PaymentContext,
+        ledger_entry_id: str,
+        guards_chain: Any,
+        reservation_tokens: list[str]
+    ) -> PaymentResult:
+        """Queue a payment for later execution."""
+        # Create intent
+        intent = await self._intent_service.create(
+            wallet_id=context.wallet_id,
+            recipient=context.recipient,
+            amount=context.amount,
+            metadata=context.metadata
+        )
+        # We might want to link intent to ledger, or update ledger to PENDING/QUEUED
+        await self._ledger.update_status(
+            ledger_entry_id, 
+            LedgerEntryStatus.PENDING, 
+            metadata_updates={"intent_id": intent.id, "queued": True}
+        )
+        
+        # If we have reservations, we should probably commit them or release?
+        # If queued, funds should be reserved? 
+        # Intent creation doesn't reserve by default unless we confirm.
+        # But here we already reserved. 
+        # Strategy: Commit the reservation so budget is used, 
+        # and the intent (when processed) should NOT re-reserve.
+        # This requires the intent processor to know it's pre-reserved.
+        # For simplicity in this iteration: Release now, let queue worker re-reserve later.
+        if guards_chain:
+            await guards_chain.release(reservation_tokens)
+
+        return PaymentResult(
+            success=True, # It was successfully queued
+            transaction_id=None,
+            blockchain_tx=None,
+            amount=context.amount,
+            recipient=context.recipient,
+            method=PaymentMethod.TRANSFER,
+            status=PaymentStatus.PENDING,
+            metadata={"queued": True, "intent_id": intent.id},
+        )
+
 
     async def simulate(
         self,
