@@ -139,25 +139,67 @@ class InMemoryStorage(StorageBackend):
         """Atomically add amount."""
         from decimal import Decimal
 
-        coll = self._ensure_collection(collection)
+        # Ensure collection exists
+        if collection not in self._data:
+            self._data[collection] = {}
+        coll = self._data[collection]
 
-        # In asyncio single-threaded loop, this is atomic (no awaits)
-        # Handle existing value which might be a dict (if misused) or string
+        # Get current value
         current_val = coll.get(key)
-
-        if isinstance(current_val, dict):
-            # Special case: if key holds dict, we can't increment it.
-            # But relying on caller to use separate keys.
-            # Fallback: treat as 0 overwrite? No, exception.
-            # For simplicity in this fix, we assume it's a number-like string or missing
+        
+        # Parse current value
+        try:
+            current_dec = Decimal(str(current_val)) if current_val is not None else Decimal("0")
+        except Exception:
+             # If it's a dict or invalid, start from 0
             current_dec = Decimal("0")
-        else:
-            current_dec = Decimal(str(current_val)) if current_val else Decimal("0")
 
         delta = Decimal(amount)
         new_val = current_dec + delta
+        
+        # Store as string to match Redis behavior
         coll[key] = str(new_val)
         return str(new_val)
+
+    async def acquire_lock(
+        self,
+        key: str,
+        ttl: int = 30,
+    ) -> bool:
+        """Acquire lock (simple in-memory implementation)."""
+        import time
+        
+        # Use a hidden collection for locks
+        if "_locks" not in self._data:
+            self._data["_locks"] = {}
+        locks = self._data["_locks"]
+        
+        now = time.time()
+        
+        # Check if lock exists and is valid
+        if key in locks:
+            expiry = locks[key]
+            # If expiry is in future, it's locked
+            if now < float(expiry):
+                return False 
+            
+        # Set lock (acquire)
+        locks[key] = now + ttl
+        return True
+
+    async def release_lock(
+        self,
+        key: str,
+    ) -> bool:
+        """Release lock."""
+        if "_locks" not in self._data:
+            return False
+            
+        locks = self._data["_locks"]
+        if key in locks:
+            del locks[key]
+            return True
+        return False
 
     async def health_check(self) -> bool:
         """Always healthy for in-memory."""
