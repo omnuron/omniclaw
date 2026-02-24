@@ -53,6 +53,7 @@ dependencies = [
     "python-dotenv>=1.2.0",
     "cryptography>=44.0.0",
     "redis>=7.1.0",
+    "tenacity>=8.2.0",
 ]
 
 [project.optional-dependencies]

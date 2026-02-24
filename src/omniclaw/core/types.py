@@ -124,6 +124,14 @@ def normalize_network(network: Network | str | None) -> Network | None:
     return Network.from_string(str(network))
 
 
+class PaymentStrategy(str, Enum):
+    """Strategy for handling payment execution reliability."""
+
+    FAIL_FAST = "fail_fast"  # If network down, raise immediately
+    RETRY_THEN_FAIL = "retry_then_fail"  # Retry transient errors, then raise
+    QUEUE_BACKGROUND = "queue_background"  # If down/busy, queue for later (return PENDING)
+
+
 class PaymentMethod(str, Enum):
     """Payment method types."""
 
