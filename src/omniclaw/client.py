@@ -44,6 +44,7 @@ from omniclaw.protocols.x402 import X402Adapter
 from omniclaw.resilience.circuit import CircuitBreaker, CircuitOpenError
 from omniclaw.resilience.retry import execute_with_retry
 from omniclaw.storage import get_storage
+from omniclaw.risk.guard import RiskGuard, RiskFlaggedError, RiskBlockedError
 from omniclaw.trust.gate import TrustGate
 from omniclaw.identity.types import TrustCheckResult, TrustPolicy, TrustVerdict
 from omniclaw.wallet.service import WalletService
@@ -412,6 +413,71 @@ class OmniClaw:
                     error=f"Blocked by guard: {e}",
                     guards_passed=guards_passed,
                     metadata={"guard_reason": str(e)},
+                )
+            except RiskFlaggedError as e:
+                # RISK FLAG: Create intent for review
+                intent = await self._intent_service.create(
+                    wallet_id=wallet_id,
+                    recipient=recipient,
+                    amount=amount_decimal,
+                    purpose=purpose,
+                    metadata=meta,
+                )
+                
+                # Reserve funds for the intent so they are locked while pending review
+                # The guard reservation (if any) is released, replaced by this dedicated intent reservation
+                if guards_chain and reservation_tokens:
+                    await guards_chain.release(reservation_tokens)
+                
+                await self._reservation.reserve(wallet_id, amount_decimal, intent.id)
+                intent.reserved_amount = amount_decimal
+                
+                await self._ledger.update_status(
+                    ledger_entry.id,
+                    LedgerEntryStatus.PENDING,
+                    metadata_updates={
+                        "risk_score": e.score,
+                        "risk_reasons": e.reasons,
+                        "intent_id": intent.id,
+                        "status": "flagged_for_review"
+                    }
+                )
+                return PaymentResult(
+                    success=False,
+                    transaction_id=None,
+                    blockchain_tx=None,
+                    amount=amount_decimal,
+                    recipient=recipient,
+                    method=PaymentMethod.TRANSFER,
+                    status=PaymentStatus.PENDING,
+                    error=f"Risk Flagged ({e.score:.1f}): Requires Review",
+                    guards_passed=guards_passed,
+                    metadata={
+                        "risk_score": e.score,
+                        "risk_flagged": True,
+                        "intent_id": intent.id
+                    }
+                )
+            except RiskBlockedError as e:
+                if guards_chain and reservation_tokens:
+                    await guards_chain.release(reservation_tokens)
+                    
+                await self._ledger.update_status(
+                    ledger_entry.id,
+                    LedgerEntryStatus.BLOCKED,
+                    metadata_updates={"risk_blocked": True, "error": str(e)}
+                )
+                return PaymentResult(
+                    success=False,
+                    transaction_id=None,
+                    blockchain_tx=None,
+                    amount=amount_decimal,
+                    recipient=recipient,
+                    method=PaymentMethod.TRANSFER,
+                    status=PaymentStatus.BLOCKED,
+                    error=f"Risk Blocked: {e}",
+                    guards_passed=guards_passed,
+                    metadata={"risk_blocked": True}
                 )
 
         # Acquire Fund Lock (Mutex) to prevent double-spend race conditions
