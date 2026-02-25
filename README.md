@@ -4,10 +4,14 @@
 
 [![PyPI version](https://badge.fury.io/py/omniclaw.svg)](https://badge.fury.io/py/omniclaw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-100%25%20passing-brightgreen)]()
+[![ERC-8004](https://img.shields.io/badge/ERC--8004-Compliant-blue)]()
 
-**OmniClaw** gives AI agents the ability to autonomously spend money—safely, instantly, and across any blockchain.
+**OmniClaw** gives AI agents the ability to autonomously spend money—safely, instantly, and across any blockchain. It's the first SDK to combine **payment execution**, **agent identity verification** (ERC-8004), and **enterprise-grade resilience** in a single library.
 
-> 💡 *Think of it as Stripe for AI agents—except instead of helping merchants accept payments, we help agents make payments.*
+> 💡 *Think of it as Stripe for AI agents—except instead of helping merchants accept payments, we help agents make payments, verify trust, and coordinate safely.*
+
+📖 **[Full Feature Reference →](docs/FEATURES.md)** — Detailed API docs, mermaid diagrams, execution pipeline, and 281-test coverage breakdown.
 
 ---
 
@@ -15,27 +19,16 @@
 
 OmniClaw is a **developer SDK** that provides the complete payment infrastructure layer for autonomous AI agents:
 
-### Core Capabilities
-
 | Capability | Description |
 |:-----------|:------------|
 | 💳 **Developer-Controlled Wallets** | USDC wallets powered by Circle with full programmatic control |
-| 🛡️ **Atomic Spending Guards** | Budget, rate, transaction, and recipient limits that prevent runaway spending |
+| 🛡️ **Safety Kernel** | Budget, rate, transaction, and recipient guards with atomic guarantees |
 | 🌐 **Universal Payment Routing** | Seamless routing across x402 APIs, direct transfers, and cross-chain (CCTP) |
+| 🔐 **ERC-8004 Trust Gate** | On-chain agent identity verification + reputation scoring |
+| 🔒 **2-Phase Commit & Fund Locking** | Distributed mutex locks prevent double-spending across agent swarms |
+| ⚡ **Circuit Breaker & Retry** | Distributed resilience layer with exponential backoff |
 | 📊 **Complete Observability** | Built-in ledger, webhooks, and analytics for every transaction |
 | 🔌 **Framework Agnostic** | Works with LangChain, OmniCoreAgent, AutoGPT, or any custom agent |
-
-### What Agents Can Pay For
-
-- **APIs & Data Access** — x402 paywalled resources, premium data feeds
-- **Services & Compute** — Micro-services, GPU hours, cloud resources
-- **Subscriptions & Digital Goods** — SaaS tools, content, models
-- **Transfers & Payroll** — Batch payments to wallets, contractor payouts
-- **Agent-to-Agent Commerce** — A2A payments, escrow, streaming *(coming soon)*
-
-### The Buyer-Side Infrastructure
-
-OmniClaw complements payment protocols (x402, UCP, AP2) by providing the **execution logic**, **safety controls**, and **developer experience** that makes autonomous agent spending practical, safe, and observable.
 
 ---
 
@@ -52,196 +45,92 @@ result = await client.pay(wallet_id="...", recipient="0x...", amount=10.00)
 
 ---
 
-## 🎯 The OmniClaw Story
-
-### The Problem
-Traditional blockchain SDKs are designed for humans with screens, private keys, and confirmation buttons. When you give an AI agent a private key, you create a risk vector—hallucinations, prompt injection, or logic bugs can drain a treasury in seconds.
-
-### The Solution  
-OmniClaw is **designed for code that thinks, reasons, and executes transactions autonomously**. We wrap every wallet in a **Safety Kernel** that:
-
-1. **Guards** check every payment against strict policies (Budget, Velocity, Whitelists)
-2. **Simulation** predicts the outcome and fees before signing
-3. **Routing** automatically selects the optimal path (Transfer, x402, or Cross-Chain)
-
-### What This Means For You
-
-| You Want To... | OmniClaw Does... |
-|:---------------|:---------------------|
-| Send USDC to an address | `pay()` → Transfer Adapter handles it |
-| Pay an API that returns 402 | `pay()` → x402 Adapter negotiates, pays, retries |
-| Move funds to another chain | `pay()` → Gateway Adapter uses CCTP automatically |
-| Prevent overspending | Guards enforce limits atomically |
-| Require human approval | ConfirmGuard pauses payments for review |
-
-**One method. Any payment type. All safety built-in.**
-
----
-
-## ⚡ Key Features
-
-*   **Zero Config**: Just provide your Circle API key. Entity Secrets, encryption, and credentials are managed automatically.
-*   **Agent-Native**: Simple `client.pay()` interface that "just works". No ABIs, gas limits, or nonces.
-*   **Safety Kernel**: Guards prevent runaway spending with atomic guarantees—even under concurrent load.
-*   **Unified Routing**: One method transparently handles USDC transfers, x402 API payments, and cross-chain transfers.
-*   **Payment Intents**: Authorize-then-Capture workflows for multi-agent coordination or DAO approval.
-*   **Full Observability**: Built-in ledger, DEBUG logging, and webhook support.
-
----
-
 ## 📚 Table of Contents
 
-1.  [**What Can You Build?**](#-what-can-you-build)
-2.  [**The Three Payment Protocols**](#-the-three-payment-protocols)
-3.  [**Core Architecture**](#-core-architecture)
-4.  [**Installation**](#-installation)
-5.  [**Quick Start**](#-quick-start)
-6.  [**Configuration Reference**](#-configuration-reference)
-7.  [**Wallet Management**](#-wallet-management)
-8.  [**The Payment API**](#-the-payment-api)
-9.  [**The Guard System (Safety Kernel)**](#-the-guard-system-safety-kernel)
-10. [**Payment Intents (Auth/Capture)**](#-payment-intents-authcapture)
-11. [**Batch Payments**](#-batch-payments)
-12. [**Webhooks & Events**](#-webhooks--events)
+1.  [**Core Architecture**](#-core-architecture)
+2.  [**Installation**](#-installation)
+3.  [**Quick Start**](#-quick-start)
+4.  [**Payment Routing**](#-payment-routing)
+5.  [**The Guard System (Safety Kernel)**](#-the-guard-system-safety-kernel)
+6.  [**ERC-8004 Trust Gate**](#-erc-8004-trust-gate)
+7.  [**2-Phase Commit & Fund Locking**](#-2-phase-commit--fund-locking)
+8.  [**Circuit Breaker & Resilience**](#-circuit-breaker--resilience)
+9.  [**Payment Intents (Auth/Capture)**](#-payment-intents-authcapture)
+10. [**Agent Identity & Resolution**](#-agent-identity--resolution)
+11. [**Wallet Management**](#-wallet-management)
+12. [**Configuration Reference**](#-configuration-reference)
 13. [**Observability & Ledger**](#-observability--ledger)
-14. [**Security & Best Practices**](#-security--best-practices)
-15. [**Error Handling**](#-error-handling)
-16. [**Contributing**](#-contributing)
+14. [**Webhooks & Events**](#-webhooks--events)
+15. [**Testing**](#-testing)
+16. [**Security & Best Practices**](#-security--best-practices)
+17. [**Error Handling**](#-error-handling)
+18. [**Contributing**](#-contributing)
 
 ---
 
-## 💡 What Can You Build?
-
-OmniClaw is the engine for the **Agentic Economy**. Here are the winning use cases:
-
-### 1. Trustless Autonomous Agents (Hackathon Track 🤖)
-Build agents that manage their own treasury without human oversight.
-*   **How**: Use `BudgetGuard` and `RateLimitGuard` to mathematically guarantee the agent cannot burn its runway.
-*   **Example**: An SEO Agent that autonomously buys backlinks and ads, strictly capped at $50/day.
-*   **Code**: [View Gemini Agent Example](examples/gemini_agent.py)
-
-### 2. Multi-Agent Commerce Systems
-Enable agents to trade services with each other.
-*   **How**: Use `PaymentIntents` for "Authorize-then-Capture" flows. Agent A orders data, Agent B delivers, Agent A confirms payment.
-*   **Example**: A Supply Chain Swarm where a 'Buyer Agent' approves po's from 'Supplier Agents' autonomously.
-
-### 3. Usage-Based API Services (Hackathon Track 🪙)
-Monetize your AI tools per-token or per-request.
-*   **How**: Use the `x402` Adapter.
-*   **Example**: An LLM wrapper that charges 0.01 USDC per prompt via HTTP 402 headers.
-*   **Code**: [View x402 Server Example](examples/x402_server.py)
-
-### 4. Cross-Chain Arbitrage Bots
-Agents that move capital instantly between chains.
-*   **How**: Use the `GatewayAdapter` (Circle CCTP).
-*   **Example**: A Liquidity Agent that rebalances USDC from Ethereum to Base when yields change.
-
----
-
-## 🔌 The Three Payment Protocols
-
-OmniClaw automatically routes payments through the right protocol. You just call `pay()`—we handle the rest.
-
-### 1. Transfer Adapter — Direct USDC Transfers
-**When**: Recipient is a blockchain address (`0x...` or Solana format)
-
-```python
-# Agent pays a vendor directly
-result = await client.pay(
-    wallet_id=wallet.id,
-    recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0",
-    amount="25.00"
-)
-```
-
-*Uses Circle's Developer-Controlled Wallets for secure, gasless transfers.*
-
-### 2. x402 Adapter — Pay-Per-Use APIs
-**When**: Recipient is an HTTP URL (`https://...`)
-
-The [x402 protocol](https://x402.org) enables "HTTP 402 Payment Required" flows. Your agent can pay for API access automatically.
-
-```python
-# Agent pays for premium API access
-result = await client.pay(
-    wallet_id=wallet.id,
-    recipient="https://api.premium-data.com/resource",
-    amount="0.10"  # Or let x402 negotiate the price
-)
-```
-
-**How it works:**
-1. Agent requests the URL
-2. Server returns `402 Payment Required` with price in headers
-3. OmniClaw pays the invoice automatically
-4. Agent retries with payment proof, gets the data
-
-*Perfect for LLM wrappers, data APIs, or any usage-based service.*
-
-### 3. Gateway Adapter — Cross-Chain Transfers
-**When**: `destination_chain` is specified (or recipient uses `chain:address` format)
-
-Uses Circle's CCTP (Cross-Chain Transfer Protocol) to move USDC between chains without bridges.
-
-```python
-# Agent moves funds from Arc to Base
-result = await client.pay(
-    wallet_id=wallet.id,
-    recipient="0xRecipientOnBase...",
-    amount="100.00",
-    destination_chain=Network.BASE
-)
-```
-
-**Supported Chains**: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, Solana, and more.
-
-
-## 🏗 Core Architecture
-
-OmniClaw follows a **Hub-and-Spoke** architecture tailored for multi-agent systems.
-
---
-
-## 🏗️ Architecture Overview
+## 🏗️ Core Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  APPLICATION LAYER                              │
-│  Research Agent │ Trading Bot │ HR Agent        │
-│  Built with: LangChain, OmniCoreAgent, etc.     │
-└────────────────────┬────────────────────────────┘
-                     │ uses
-                     ▼
-┌─────────────────────────────────────────────────┐
-│  🎯 OMNICLAW                                │
-│  Payment Execution Infrastructure               │
-│  • Wallets (Circle)    • Guards (Safety)        │
-│  • Router (x402, Transfer, Cross-Chain)         │
-│  • Ledger (Observability)                       │
-└────────────────────┬────────────────────────────┘
-                     │ implements
-                     ▼
-┌─────────────────────────────────────────────────┐
-│  PROTOCOL LAYER                                 │
-│  x402 │ UCP │ AP2 │ CCTP                        │
-└────────────────────┬────────────────────────────┘
-                     │ settles on
-                     ▼
-┌─────────────────────────────────────────────────┐
-│  BLOCKCHAIN LAYER                               │
-│  Arc │ Base │ Ethereum │ Solana                 │
-└─────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  APPLICATION LAYER                                             │
+│  Research Agent │ Trading Bot │ HR Agent │ Agent Swarms         │
+│  Built with: LangChain, OmniCoreAgent, AutoGPT, etc.          │
+└──────────────────────────┬─────────────────────────────────────┘
+                           │ uses
+                           ▼
+┌────────────────────────────────────────────────────────────────┐
+│  🎯 OMNICLAW SDK                                               │
+│                                                                │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │  Trust Gate  │  │ Safety Kernel│  │  Payment Router      │  │
+│  │  (ERC-8004)  │  │  (5 Guards)  │  │  Transfer│x402│CCTP  │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
+│         │                 │                      │              │
+│  ┌──────┴───────┐  ┌──────┴───────┐  ┌──────────┴───────────┐  │
+│  │   Identity   │  │  Fund Lock   │  │     Resilience       │  │
+│  │   Resolver   │  │  (2PC/Mutex) │  │  Circuit│Retry│Backoff│  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│                                                                │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │   Intents   │  │    Ledger    │  │     Webhooks         │  │
+│  │ Auth/Capture│  │  Audit Trail │  │  Event Processing    │  │
+│  └─────────────┘  └──────────────┘  └──────────────────────┘  │
+└──────────────────────────┬─────────────────────────────────────┘
+                           │ implements
+                           ▼
+┌────────────────────────────────────────────────────────────────┐
+│  PROTOCOL LAYER                                                │
+│  x402 │ ERC-8004 │ CCTP │ UCP │ AP2                            │
+└──────────────────────────┬─────────────────────────────────────┘
+                           │ settles on
+                           ▼
+┌────────────────────────────────────────────────────────────────┐
+│  BLOCKCHAIN LAYER                                              │
+│  Ethereum │ Base │ Arbitrum │ Optimism │ Polygon │ Solana      │
+└────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Module Map
 
-
+| Module | Path | Purpose |
+|:-------|:-----|:--------|
+| **Client** | `omniclaw/client.py` | Main SDK entry point — `OmniClaw` class |
+| **Trust Gate** | `omniclaw/trust/` | ERC-8004 trust evaluation pipeline |
+| **Identity** | `omniclaw/identity/` | Agent identity resolution & types |
+| **Guards** | `omniclaw/guards/` | 5 safety guards with atomic guarantees |
+| **Payment Router** | `omniclaw/payment/` | Intelligent routing (Transfer, x402, CCTP) |
+| **Protocols** | `omniclaw/protocols/` | x402, CCTP adapter implementations |
+| **Intents** | `omniclaw/intents/` | Auth/Capture workflows + fund reservation |
+| **Ledger** | `omniclaw/ledger/` | Transaction audit trail + fund locking (2PC) |
+| **Resilience** | `omniclaw/resilience/` | Circuit breaker + retry with backoff |
+| **Storage** | `omniclaw/storage/` | Memory & Redis backends |
+| **Core** | `omniclaw/core/` | Types, exceptions, ERC-8004 ABIs, config |
+| **Webhooks** | `omniclaw/webhooks/` | Ed25519 signature verification |
+| **Wallet** | `omniclaw/wallet/` | Circle wallet management |
 
 ---
 
 ## 📦 Installation
-
-Install via pip:
 
 ```bash
 pip install omniclaw
@@ -261,537 +150,611 @@ uv add omniclaw
 
 ## ⚡ Quick Start
 
-The "Zero to Hero" path to getting your agent paying securely.
-
 ### 1. Initialize the Client
-The client automatically generates an Entity Secret if one is not provided, making setup frictionless.
 
 ```python
 import logging
 from omniclaw import OmniClaw, Network
 
-# Reads CIRCLE_API_KEY from environment variables automatically
 client = OmniClaw(
-    network=Network.ARC_TESTNET,  # Defaults to ARC_TESTNET
-    log_level=logging.INFO        # Use DEBUG for full request tracing
+    network=Network.ARC_TESTNET,
+    log_level=logging.INFO,
+    trust_policy="standard",              # ERC-8004: "permissive" | "standard" | "strict"
+    rpc_url="https://eth.llamarpc.com",    # RPC for on-chain identity reads
 )
 ```
 
-### 2. Create an Identity
-Agents need wallets. In OmniClaw, we organize wallets into **Wallet Sets**.
+### 2. Create a Wallet
 
 ```python
-# Create a wallet specifically for "Agent-007"
-# This checks if a set exists for this agent, and creates one if not.
 wallet_set, wallet = await client.create_agent_wallet(agent_name="Agent-007")
-
 print(f"Agent Wallet Address: {wallet.address}")
-print(f"Wallet ID: {wallet.id}")
 ```
 
 ### 3. Add Safety Guards
-**CRITICAL**: Never deploy an unguarded agent.
 
 ```python
-# 1. Budget Guard: Max $100 per day, resetting at midnight UTC
-await client.add_budget_guard(
-    wallet.id,
-    daily_limit="100.00",
-    name="safety_budget"
-)
-
-# 2. Recipient Guard: Whitelist approved vendors only
-await client.add_recipient_guard(
-    wallet.id,
-    mode="whitelist",
-    domains=["api.openai.com", "aws.amazon.com", "anthropic.com"]
-)
+await client.add_budget_guard(wallet.id, daily_limit="100.00")
+await client.add_recipient_guard(wallet.id, mode="whitelist",
+    domains=["api.openai.com", "anthropic.com"])
 ```
 
 ### 4. Execute Payment
-The agent simply decides *who* to pay and *how much*.
-
-```python
-try:
-    result = await client.pay(
-        wallet_id=wallet.id,
-        recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0", 
-        amount="10.50",
-        purpose="Server costs for Jan 2025"
-    )
-
-    if result.success:
-        print(f"Payment Confirmed! Tx: {result.blockchain_tx}")
-    else:
-        print(f"Payment Failed: {result.error}")
-
-except Exception as e:
-    print(f"Critical Failure: {e}")
-```
-
----
-
-## ⚙ Configuration Reference
-
-OmniClaw can be configured via Environment Variables or direct Constructor Arguments. **Environment Variables are recommended** for security.
-
-### Environment Variables
-
-| Variable | Required | Description | Default |
-| :--- | :--- | :--- | :--- |
-| `CIRCLE_API_KEY` | **Yes** | Your API Key from Circle Console. | - |
-| `ENTITY_SECRET` | No | 32-byte hex secret for transaction signing. | **Auto-Generated** if missing |
-| `OMNICLAW_STORAGE_BACKEND` | No | Persistence layer: `memory` or `redis`. | `memory` |
-| `OMNICLAW_REDIS_URL` | No | Connection string if `redis` backend is used. | `redis://localhost:6379/0` |
-| `OMNICLAW_LOG_LEVEL` | No | `DEBUG`, `INFO`, `WARNING`, `ERROR`. | `INFO` |
-| `OMNICLAW_ENV` | No | `production` or `development`. | `development` |
-
-### Constructor Arguments (`OmniClaw`)
-
-```python
-client = OmniClaw(
-    circle_api_key="...",       # Optional if Env Var set
-    entity_secret="...",        # Optional if Env Var set
-    network=Network.ARC_TESTNET, # Target Blockchain Network
-    log_level=logging.DEBUG     # Override logging
-)
-```
-
-### Entity Secret Management
-
-The **Entity Secret** is a 32-byte private key required by Circle to sign wallet operations. OmniClaw handles this automatically, but understanding it helps with troubleshooting.
-
-#### How Auto-Setup Works
-
-When you initialize `OmniClaw` without an `ENTITY_SECRET`:
-
-1. SDK generates a new 32-byte secret
-2. Registers it with Circle API
-3. Saves a **recovery file** to `~/.config/omniclaw/`
-4. Appends the secret to your `.env` file
-
-```python
-# First run - auto-generates and registers entity secret
-from omniclaw import OmniClaw
-client = OmniClaw()  # Reads CIRCLE_API_KEY from .env, generates ENTITY_SECRET
-```
-
-#### Recovery File Location
-
-Recovery files are stored in a secure, platform-specific directory:
-
-| Platform | Location |
-|:---------|:---------|
-| Linux | `~/.config/omniclaw/` |
-| macOS | `~/Library/Application Support/omniclaw/` |
-| Windows | `%APPDATA%/omniclaw/` |
-
-You can find your config directory programmatically:
-
-```python
-from omniclaw import get_config_dir, find_recovery_file
-
-print(get_config_dir())       # ~/.config/omniclaw
-print(find_recovery_file())   # Path to recovery file, or None
-```
-
-#### Troubleshooting: "Entity Secret Invalid"
-
-If you see this error, it means the `ENTITY_SECRET` in your `.env` doesn't match what's registered with Circle for your API key.
-
-**Cause**: You previously registered an entity secret, but lost access to it (missing from `.env` or deleted).
-
-**Solutions**:
-
-1. **If you have a recovery file**: Go to https://console.circle.com, navigate to Developer > Entity Secret, upload the recovery file to reset your secret.
-
-2. **If you don't have a recovery file**: Create a new API key at https://console.circle.com. Then remove `ENTITY_SECRET` from your `.env` and restart your app.
-
-For full details, see: [Circle Entity Secret Management](https://developers.circle.com/w3s/entity-secret-management)
-
----
-
-## Wallet Management
-
-OmniClaw organizes wallets into **Wallet Sets** to help you manage agent swarms and user wallets.
-
-### Agent Wallets
-Best for autonomous agents. Creates a Wallet Set named `agent-{name}` and a wallet within it.
-
-```python
-wallet_set, wallet = await client.create_agent_wallet(
-    agent_name="ShoppingBot-1",
-    blockchain=Network.ARC    # Optional: Specify chain
-)
-```
-
-### User Wallets
-Best for end-users of your application. Creates a Wallet Set with `custody_type=ENDUSER` (if supported).
-
-```python
-wallet_set, wallet = await client.create_user_wallet(
-    user_id="user_88123",
-    blockchain=Network.SOLANA   # Optional
-)
-```
-
-### Wallet Sets
-A **Wallet Set** is a container for multiple wallets. Guards can be applied to an entire set.
-
-```python
-# Create a set for a team of agents
-marketing_swarm = await client.create_wallet_set(name="marketing-swarm")
-
-# Create wallets in that set
-agent_a = await client.create_wallet(
-    wallet_set_id=marketing_swarm.id, 
-    blockchain=Network.ETH
-)
-agent_b = await client.create_wallet(
-    wallet_set_id=marketing_swarm.id, 
-    blockchain=Network.ARC
-)
-```
-
----
-
-## 💳 The Payment API
-
-The `pay()` method is the heart of the SDK. It uses an intelligent routing engine to determine the best way to execute a transaction.
-
-### Understanding `pay()`
-
-```python
-async def pay(
-    self,
-    # --- REQUIRED ---
-    wallet_id: str,                      # Source of funds
-    recipient: str,                      # Destination (Address, URL, or Domain)
-    amount: Decimal | str | float,       # Amount in USDC
-    
-    # --- ROUTING & TOPOLOGY ---
-    destination_chain: Network = None,   # Target network (for Cross-Chain)
-    
-    # --- CONTEXT ---
-    purpose: str = None,                 # Audit trail description
-    metadata: dict = None,               # Custom JSON data
-    idempotency_key: str = None,         # Prevent duplicates
-    
-    # --- EXECUTION CONTROL ---
-    fee_level: FeeLevel = MEDIUM,        # LOW, MEDIUM, HIGH
-    wait_for_completion: bool = False,   # If True, blocks until on-chain confirmation
-    timeout_seconds: float = 30.0,       # Max wait time if blocking
-    skip_guards: bool = False,           # DANGEROUS: Bypass safety checks
-) -> PaymentResult
-```
-
-### Automatic Routing
-
-The `PaymentRouter` inspects the `recipient` format to choose an adapter:
-
-1.  **Transfer Adapter**: If `recipient` is a valid blockchain address (0x... or Base58).
-    *   *Action*: Direct on-chain USDC transfer.
-2.  **x402 Adapter**: If `recipient` is an HTTP(S) URL.
-    *   *Action*: Performs the x402 handshake (Ask for price -> Pay -> Get Token).
-3.  **Gateway Adapter**: If `destination_chain` differs from the wallet's chain.
-    *   *Action*: Uses Circle CCTP (Cross-Chain Transfer Protocol) to burn/mint USDC across chains.
-
-### Cross-Chain Payments
-
-To move USDC from Ethereum to Base, simply specify the destination chain.
 
 ```python
 result = await client.pay(
-    wallet_id=eth_wallet.id,
-    recipient="0xBaseAddress...",
-    amount="50.00",
-    destination_chain=Network.BASE  # This triggers the Gateway Adapter
+    wallet_id=wallet.id,
+    recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0",
+    amount="10.50",
+    purpose="Server costs for Jan 2025",
+    strategy="retry_then_fail",  # "fail_fast" | "retry_then_fail" | "queue_background"
+    check_trust=True,            # ERC-8004 check: True | False | None (auto)
 )
+if result.success:
+    print(f"Payment Confirmed! Tx: {result.blockchain_tx}")
+    print(f"Trust Score: {result.metadata['trust']['wts']}")  # ERC-8004 WTS
 ```
 
-### Simulation
-You can check if a payment *would* succeed without spending money. This runs the full logic stack: Guards -> Routing -> Fee Estimation.
+The `pay()` pipeline runs **10 steps** automatically:
+
+1. **Trust Gate** (ERC-8004) → identity check + reputation scoring → `APPROVED` / `HELD` / `BLOCKED`
+2. **Ledger entry** → audit trail created
+3. **Guard chain** → budget, rate, recipient, confirm checks (atomic reserve)
+4. **Fund lock** → distributed mutex acquired
+5. **Balance check** → available = balance − reservations
+6. **Circuit breaker** → check upstream health
+7. **Router** → select adapter (Transfer / x402 / CCTP)
+8. **Execute** → with retry strategy
+9. **Commit/release** → guards finalized or rolled back
+10. **Unlock** → mutex released
+
+---
+
+## 🔌 Payment Routing
+
+OmniClaw automatically routes payments through the right protocol. You just call `pay()`.
+
+### Transfer Adapter — Direct USDC Transfers
+**When**: Recipient is a blockchain address (`0x...`)
 
 ```python
-sim = await client.simulate(
-    wallet_id=wallet.id,
-    recipient="0x...",
-    amount="1000000.00"  # Huge amount
-)
+result = await client.pay(wallet_id=wallet.id,
+    recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0", amount="25.00")
+```
 
+### x402 Adapter — Pay-Per-Use APIs
+**When**: Recipient is an HTTP URL (`https://...`)
+
+```python
+result = await client.pay(wallet_id=wallet.id,
+    recipient="https://api.premium-data.com/resource", amount="0.10")
+```
+
+The [x402 protocol](https://x402.org) enables `HTTP 402 Payment Required` flows — your agent pays for API access automatically.
+
+### Gateway Adapter — Cross-Chain Transfers
+**When**: `destination_chain` is specified
+
+```python
+result = await client.pay(wallet_id=wallet.id,
+    recipient="0xRecipientOnBase...", amount="100.00",
+    destination_chain=Network.BASE)
+```
+
+Uses Circle's CCTP to move USDC between chains without bridges.
+
+### Simulation
+
+```python
+sim = await client.simulate(wallet_id=wallet.id, recipient="0x...", amount="1000000.00")
 if not sim.would_succeed:
-    print(f"Simulation failed: {sim.reason}")
-    # Output: "Simulation failed: Would be blocked by guard: Budget limit exceeded"
+    print(f"Blocked: {sim.reason}")
 ```
 
 ---
 
 ## 🛡 The Guard System (Safety Kernel)
 
-The **Guard System** is what makes OmniClaw unique. It is a programmable firewall for your agent's money.
+The Guard System is a programmable firewall for your agent's money. Guards are checked **atomically** — using Redis Lua scripts or memory locks — preventing race conditions even under concurrent load.
 
-Guards are checked **Atomically**. This means checking a limit and updating the usage happens in a single, locked operation (using Redis Lua scripts or atomic memory locks), preventing race conditions even with high-concurrency agents.
-
-### Budget Guard
-Enforces spending limits over time windows.
-
-**Parameters:**
-*   `daily_limit`: Max spend per 24h rolling window.
-*   `hourly_limit`: Max spend per 1h rolling window.
-*   `total_limit`: Lifetime spend limit.
+| Guard | Purpose | Key Parameters |
+|:------|:--------|:--------------|
+| **BudgetGuard** | Spending limits over time | `daily_limit`, `hourly_limit`, `total_limit` |
+| **RateLimitGuard** | Prevent tx flooding | `max_per_minute`, `max_per_hour` |
+| **SingleTxGuard** | Cap individual payments | `max_amount`, `min_amount` |
+| **RecipientGuard** | Control who gets paid | `mode`, `addresses`, `domains`, `patterns` |
+| **ConfirmGuard** | Human-in-the-loop | `threshold`, `callback` |
 
 ```python
-await client.add_budget_guard(
-    wallet.id,
-    daily_limit="50.00",   # $50 / day
-    hourly_limit="10.00",  # $10 / hour (velocity check)
-    total_limit="1000.00"  # Lifespan budget
-)
-```
+# Budget: $50/day, $10/hour, $1000 lifetime
+await client.add_budget_guard(wallet.id,
+    daily_limit="50.00", hourly_limit="10.00", total_limit="1000.00")
 
-### Rate Limit Guard
-Protects against "looping" bugs where an agent sends thousands of micro-transactions.
+# Rate: Max 5 tx/min
+await client.add_rate_limit_guard(wallet.id, max_per_minute=5, max_per_hour=20)
 
-**Parameters:**
-*   `max_per_minute`: Tx/min.
-*   `max_per_hour`: Tx/hour.
+# Transaction size: $0.50 - $100
+await client.add_single_tx_guard(wallet.id, max_amount="100.00", min_amount="0.50")
 
-```python
-await client.add_rate_limit_guard(
-    wallet.id,
-    max_per_minute=5,      # Stop infinite loops
-    max_per_hour=20
-)
-```
+# Whitelist recipients
+await client.add_recipient_guard(wallet.id, mode="whitelist",
+    addresses=["0xVendor1...", "0xVendor2..."])
 
-### Single Transaction Guard
-Prevents "fat finger" errors or massive hallucinations.
-
-**Parameters:**
-*   `max_amount`: Hard cap on any single tx.
-*   `min_amount`: Dust protection.
-
-```python
-await client.add_single_tx_guard(
-    wallet.id,
-    max_amount="100.00",    # Allow nothing over $100
-    min_amount="0.50"       # Prevent dust spam
-)
-```
-
-### Recipient Guard
-Restricts **WHO** the agent can pay. Essential for closed-loop systems.
-
-**Parameters:**
-*   `mode`: "whitelist" (allow only listed) or "blacklist" (block listed).
-*   `addresses`: List of exact blockchain addresses.
-*   `domains`: List of DNS domains (for x402 payments).
-*   `patterns`: List of Regex patterns.
-
-```python
-await client.add_recipient_guard(
-    wallet.id,
-    mode="whitelist",
-    addresses=["0xEmployee1...", "0xEmployee2..."],
-    domains=["internal-service.corp"]
-)
-```
-
-### Confirm Guard
-Implements "Human-in-the-Loop". Payments over a threshold are **PAUSED** until approved via webhook/API.
-
-**Parameters:**
-*   `threshold`: Amount above which confirmation is needed.
-*   `callback`: Async function (for local testing) or Webhook URL.
-
-```python
-await client.add_confirm_guard(
-    wallet.id,
-    threshold="500.00"  # Payments > $500 require approval
-)
+# Human approval for >$500
+await client.add_confirm_guard(wallet.id, threshold="500.00")
 ```
 
 ### Atomic Guarantees
-OmniClaw guarantees that **Checks** and **Effects** are atomic.
-*   *Scenario*: 10 parallel requests of $10 arrive against a $50 budget.
-*   *Result*: Exactly 5 succeed. 5 fail with `BudgetExceeded`.
-*   *Mechanism*: Reservation tokens are issued during the check phase and committed only upon success. Failed transactions release the reservation.
+
+> 10 parallel requests of $10 against a $50 budget → **Exactly 5 succeed. 5 fail with `BudgetExceeded`.**
+
+Reservation tokens are issued during the check phase and committed only upon success. Failed transactions release reservations.
+
+---
+
+## 🔐 ERC-8004 Trust Gate
+
+OmniClaw implements the [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004) standard for on-chain agent identity verification and reputation scoring.
+
+### What It Does
+
+Before executing a payment, the Trust Gate evaluates the recipient against on-chain data:
+
+```
+Payment Request → Trust Gate → Identity Registry → Reputation Registry → Policy Engine → Verdict
+                                    │                      │
+                                    ▼                      ▼
+                              Agent Identity         Reputation Score
+                              (ERC-721 token)        (WTS algorithm)
+```
+
+### Per-Payment Trust Control
+
+The `check_trust` parameter lets you control ERC-8004 checks per payment, independently from safety guards:
+
+```python
+# Auto (default): check trust if trust_gate configured and guards not skipped
+await client.pay(wallet_id=w, recipient="0x...", amount="10.00")
+
+# Force trust check even with skip_guards=True
+await client.pay(wallet_id=w, recipient="0x...", amount="10.00",
+    skip_guards=True, check_trust=True)
+
+# Skip trust check but keep safety guards active
+await client.pay(wallet_id=w, recipient="0x...", amount="10.00",
+    check_trust=False)
+
+# Simulate also supports check_trust
+sim = await client.simulate(wallet_id=w, recipient="0x...", amount="10.00",
+    check_trust=False)
+```
+
+| `check_trust` | `skip_guards` | Trust Gate Runs? |
+|:-------------|:-------------|:----------------|
+| `None` (default) | `False` | ✅ Yes |
+| `None` (default) | `True` | ❌ No |
+| `True` | `True` | ✅ Yes |
+| `False` | `False` | ❌ No |
+
+### Verdicts
+
+| Verdict | Meaning | Action |
+|:--------|:--------|:-------|
+| ✅ `APPROVED` | Trusted agent, good reputation | Payment proceeds |
+| ⏸️ `HELD` | New/unverified agent | Queued for human review |
+| 🚫 `BLOCKED` | Fraud flag, blocklisted, or failed policy | Payment rejected |
+
+### 10-Check Policy Engine
+
+The Trust Gate applies checks in strict priority order:
+
+1. **Blocklist** — Address blocked? → `BLOCKED`
+2. **Whitelist** — Org-whitelisted? → Skip remaining checks
+3. **Identity Required** — Is registration on-chain?
+4. **Fraud Tag** — `fraud`, `scam`, `phishing` detected?
+5. **New Agent** — Too few feedback signals?
+6. **Min Feedback Count** — Enough data points?
+7. **Min WTS** — Weighted Trust Score above threshold?
+8. **High-Value WTS** — Extra scrutiny for large payments
+9. **Attestations** — Required certs (e.g., `kyb`) present?
+10. **All Pass** → `APPROVED`
+
+### Policy Presets
+
+```python
+from omniclaw.identity.types import TrustPolicy
+
+# Use presets
+permissive = TrustPolicy.permissive()  # Pass most, block known fraud
+standard   = TrustPolicy.standard()    # Hold new agents, min WTS=50
+strict     = TrustPolicy.strict()      # Enterprise: WTS≥70, KYB required
+```
+
+### ERC-8004 Registry Coverage
+
+| Registry | Functions | Status |
+|:---------|:---------|:-------|
+| Identity (ERC-721 + extensions) | 13 functions | ✅ Complete |
+| Reputation (Feedback + Scoring) | 10 functions | ✅ Complete |
+| Validation (Request/Response) | 5 functions | ✅ ABI ready (awaiting mainnet deployment) |
+
+**28 total function selectors** — all keccak256-verified against the official spec.
+
+### Deployed Contract Addresses
+
+| Network | Identity Registry | Reputation Registry |
+|:--------|:-----------------|:-------------------|
+| ETH Mainnet | `0x8004A169FB4a3325...` | `0x8004BAa17C55a881...` |
+| Base Sepolia | `0x8004A818BFB912...` | `0x8004B663056A597D...` |
+| ETH Sepolia | `0x8004A818BFB912...` | `0x8004B663056A597D...` |
+
+### Weighted Trust Score (WTS) Algorithm
+
+The scoring engine computes a 0-100 reputation score:
+
+1. **Filter self-reviews** — Agent's own feedback excluded
+2. **Recency decay** — Recent feedback weighted higher (1.0x → 0.5x → 0.2x)
+3. **Verified submitter boost** — 1.5x weight for registered agents
+4. **Fraud tag detection** — Flags `fraud`, `scam`, `malicious`, `spam`, `phishing`
+5. **Weighted average** — normalized_score × weight / total_weight
+6. **Min sample guard** — <3 signals → `new_agent` flag
+
+### Cache TTLs
+
+| Data Type | TTL | Purpose |
+|:----------|:----|:--------|
+| Identity | 5 min | On-chain agent registration |
+| Reputation | 2 min | Feedback signals (changes frequently) |
+| Metadata | 10 min | Off-chain registration file |
+| Policy | 60 min | Policy config (rarely changes) |
+
+---
+
+## 🔒 2-Phase Commit & Fund Locking
+
+OmniClaw prevents double-spending across concurrent agents with a **distributed 2-Phase Commit** system.
+
+### How It Works
+
+```
+Phase 1 (Prepare):
+  Agent A wants to pay $50
+  → FundLockService.acquire(wallet_id, $50)
+  → Distributed mutex acquired (Redis/Memory)
+  → Guards check + budget reservation
+
+Phase 2 (Commit/Rollback):
+  Success → Execute payment → Release lock
+  Failure → Rollback reservation → Release lock
+```
+
+### Fund Lock Service
+
+```python
+from omniclaw.ledger.lock import FundLockService
+
+lock_service = FundLockService(storage=redis_backend)
+
+# Acquire: Returns a lock token (or None if contention)
+token = await lock_service.acquire(
+    wallet_id="wallet_123",
+    amount=Decimal("50.00"),
+    ttl=30,          # Lock expires after 30s (deadlock protection)
+    retry_count=3,   # Retry 3 times if wallet is locked
+    retry_delay=0.5  # Wait 500ms between retries
+)
+
+# Release after payment
+await lock_service.release_with_key("wallet_123", token)
+```
+
+### Fund Reservation Service
+
+Used by the Intent system to reserve funds across multiple pending intents:
+
+```python
+from omniclaw.intents.reservation import ReservationService
+
+reservations = ReservationService(storage=redis_backend)
+await reservations.reserve("wallet_123", Decimal("200.00"), intent_id="intent_abc")
+
+# Check total reserved for a wallet
+total = await reservations.get_reserved_total("wallet_123")
+
+# Release when intent completes or cancels
+await reservations.release("intent_abc")
+```
+
+---
+
+## ⚡ Circuit Breaker & Resilience
+
+OmniClaw includes a **distributed circuit breaker** and **retry engine** to handle upstream failures gracefully.
+
+### Circuit Breaker
+
+Wraps critical external calls (Circle API, RPC providers). If failures exceed a threshold, the circuit **trips** and blocks further calls until recovery.
+
+```
+CLOSED (normal) → 5 failures → OPEN (blocking) → 30s timeout → HALF_OPEN (test) → success → CLOSED
+                                                                                   → failure → OPEN
+```
+
+```python
+from omniclaw.resilience.circuit import CircuitBreaker
+
+breaker = CircuitBreaker(
+    service_name="circle_api",
+    storage=redis_backend,
+    failure_threshold=5,    # Trip after 5 failures
+    recovery_timeout=30,    # Block for 30 seconds
+    cleanup_window=60       # Rolling failure window
+)
+
+# Use as async context manager
+async with breaker:
+    result = await circle_client.create_transfer(...)
+# Failures auto-recorded; successes heal the circuit
+```
+
+### Retry Policy
+
+Exponential backoff (1s → 2s → 4s → 8s → 16s) with smart transient error detection:
+
+```python
+from omniclaw.resilience.retry import execute_with_retry
+
+result = await execute_with_retry(
+    client.pay, wallet_id=wallet.id, recipient="0x...", amount="10.00"
+)
+# Only retries on: timeout, 500/502/503/504, connection refused, rate limit
+# Never retries on: GuardError, InsufficientBalanceError, ValidationError
+```
 
 ---
 
 ## 🧠 Payment Intents (Auth/Capture)
 
-Payment Intents separate "Authorization" (Reservation) from "Capture" (Execution). This is crucial for:
-1.  **Multi-Agent Consensus**: Agent A proposes, Agent B reviews, Agent C executes.
-2.  **Human Review**: Agent proposes a $5000 purchase, Human approves it later.
-3.  **Future Scheduling**: Plan now, execute later.
-
-### 1. Create Intent
-Logic runs, Guards check, Budget is **Reserved**, but no blockchain tx is sent.
+Payment Intents separate **Authorization** from **Capture** for multi-agent coordination, human review, and scheduled execution.
 
 ```python
+# 1. Create: Guard check + budget reservation (no blockchain tx)
 intent = await client.create_payment_intent(
-    wallet_id=wallet.id,
-    recipient="0xSupplier...",
-    amount="2000.00",
-    purpose="Q1 Supply Restock"
+    wallet_id=wallet.id, recipient="0xSupplier...",
+    amount="2000.00", purpose="Q1 Supply Restock"
 )
-
-print(f"Intent ID: {intent.id} - Status: {intent.status}")
 # Status: requires_confirmation
-```
 
-### 2. Confirm Intent
-Executes the pre-authorized plan.
-
-```python
+# 2. Confirm: Execute the pre-authorized payment
 result = await client.confirm_payment_intent(intent.id)
 # Status: succeeded
-```
 
-### 3. Cancel Intent
-Releases the reserved budget back to the pool.
-
-```python
+# 3. Cancel (releases reserved budget)
 await client.cancel_payment_intent(intent.id)
 # Status: canceled
 ```
 
 ---
 
-## 🏎 Batch Payments
+## 🆔 Agent Identity & Resolution
 
-Sending funds to 100 workers? Use `batch_pay`. It manages concurrency and result aggregation.
+The Identity Resolver fetches on-chain agent data from ERC-8004 registries and retrieves off-chain registration files.
+
+### Supported URI Schemes
+
+| Scheme | Example | Method |
+|:-------|:--------|:-------|
+| HTTPS | `https://agent.com/registration.json` | `httpx` fetch |
+| IPFS | `ipfs://QmXyz...` | Gateway fallback (3 gateways) |
+| Data URI | `data:application/json;base64,...` | Base64 decode |
+
+### Registration File Schema (ERC-8004)
+
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "MyAgent",
+  "description": "Autonomous trading bot",
+  "services": [
+    {"name": "A2A", "endpoint": "https://agent.example.com/a2a", "version": "1.0"}
+  ],
+  "registrations": [
+    {"agentId": 42, "agentRegistry": "eip155:1:0x8004A169..."}
+  ],
+  "supportedTrust": ["reputation", "crypto-economic"]
+}
+```
+
+### Endpoint Domain Verification (EIP-8004 §5)
+
+Optionally verify that HTTPS endpoints are controlled by the agent owner:
 
 ```python
-from omniclaw import PaymentRequest
+from omniclaw.identity.resolver import IdentityResolver
 
-# Build the manifest
-batch = [
-    PaymentRequest(wallet_id=w.id, recipient="0xA...", amount=10),
-    PaymentRequest(wallet_id=w.id, recipient="0xB...", amount=15),
-    PaymentRequest(wallet_id=w.id, recipient="0xC...", amount=20),
-    # ... 100 more
-]
+resolver = IdentityResolver()
+verified = await resolver.verify_all_endpoints(identity)
+# Returns: ["a2a.agent.com", "mcp.agent.com"]
+```
 
-# Execute with controlled concurrency
-batch_result = await client.batch_pay(batch, concurrency=10)
+Checks `https://{domain}/.well-known/agent-registration.json` for a matching `agentId` and `agentRegistry`.
 
-print(f"Success: {batch_result.success_count}")
-print(f"Failed: {batch_result.failed_count}")
+---
 
-# Inspect failures
-for res in batch_result.results:
-    if not res.success:
-        print(f"Failed to pay {res.recipient}: {res.error}")
+## Wallet Management
+
+### Agent Wallets
+
+```python
+wallet_set, wallet = await client.create_agent_wallet(
+    agent_name="ShoppingBot-1",
+    blockchain=Network.ARC
+)
+```
+
+### User Wallets
+
+```python
+wallet_set, wallet = await client.create_user_wallet(
+    user_id="user_88123",
+    blockchain=Network.SOLANA
+)
+```
+
+### Wallet Sets
+
+```python
+marketing_swarm = await client.create_wallet_set(name="marketing-swarm")
+agent_a = await client.create_wallet(wallet_set_id=marketing_swarm.id, blockchain=Network.ETH)
+agent_b = await client.create_wallet(wallet_set_id=marketing_swarm.id, blockchain=Network.ARC)
+```
+
+---
+
+## ⚙ Configuration Reference
+
+### Environment Variables
+
+| Variable | Required | Description | Default |
+|:---------|:---------|:------------|:--------|
+| `CIRCLE_API_KEY` | **Yes** | Circle Console API key | — |
+| `ENTITY_SECRET` | No | 32-byte hex secret for signing | **Auto-Generated** |
+| `OMNICLAW_RPC_URL` | No | Ethereum RPC endpoint for ERC-8004 | — |
+| `OMNICLAW_STORAGE_BACKEND` | No | `memory` or `redis` | `memory` |
+| `OMNICLAW_REDIS_URL` | No | Redis connection string | `redis://localhost:6379/0` |
+| `OMNICLAW_LOG_LEVEL` | No | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO` |
+| `OMNICLAW_ENV` | No | `production` or `development` | `development` |
+
+### Constructor
+
+```python
+client = OmniClaw(
+    circle_api_key="...",         # Or from CIRCLE_API_KEY env
+    entity_secret="...",          # Or from ENTITY_SECRET env
+    network=Network.ARC_TESTNET,  # Target blockchain
+    log_level=logging.DEBUG,      # Logging verbosity
+    trust_policy="standard",      # ERC-8004 trust preset (or TrustPolicy object)
+    rpc_url="https://eth.llamarpc.com",  # RPC for on-chain reads (comma-separated for fallback)
+)
+```
+
+### Entity Secret Auto-Setup
+
+When you initialize without an `ENTITY_SECRET`:
+1. SDK generates a new 32-byte secret
+2. Registers it with Circle API
+3. Saves a recovery file to `~/.config/omniclaw/`
+4. Appends the secret to your `.env` file
+
+---
+
+## 📊 Observability & Ledger
+
+Every transaction — successful, failed, or blocked — is recorded in the OmniClaw Ledger.
+
+```python
+# Get full history
+history = await client.ledger.get_history(wallet_id=wallet.id)
+
+# Sync with blockchain
+updated = await client.sync_transaction(entry_id="entry_123")
 ```
 
 ---
 
 ## 🎣 Webhooks & Events
 
-OmniClaw includes a **verifiable webhook parser**. If you use Circle's Notification Service, you can forward events to your agent securely.
-
-### Supported Events
-*   `payment.received`: Funds landed in wallet.
-*   `payment.sent`: Transaction confirmed.
-*   `transaction.failed`: Reverted on-chain.
-
-### Verifying Signatures
-We implement Ed25519 signature verification compatible with Circle's standard.
+Verifiable webhook parser with Ed25519 signature verification:
 
 ```python
-# In your FastAPI / Flask / Django handler
 @app.post("/webhooks/circle")
 async def handle_webhook(request: Request):
-    # 1. Get raw bytes and headers
     body = await request.body()
-    headers = request.headers
-    
-    try:
-        # 2. Verify & Parse (Throws on invalid signature)
-        event = client.webhooks.handle(body, headers)
-        
-        # 3. Handle Business Logic
-        if event.type == "payment.received":
-             print(f"Received {event.data.amount} USDC!")
-             
-    except Exception as e:
-        return Response(status_code=400)
+    event = client.webhooks.handle(body, request.headers)
+
+    if event.type == "payment.received":
+        print(f"Received {event.data.amount} USDC!")
 ```
+
+**Supported Events:** `payment.received`, `payment.sent`, `transaction.failed`
 
 ---
 
-## 📊 Observability & Ledger
+## 🧪 Testing
 
-Every transaction—whether successful, failed, or blocked by a guard—is recorded in the **OmniClaw Ledger**.
+OmniClaw has a comprehensive test suite with **25 test files** covering all modules.
 
-### The Ledger Schema
-The local ledger (Memory or Redis) acts as the "source of truth" for the agent's history, separate from the blockchain.
+```bash
+# Run all trust gate tests (100 tests)
+uv run pytest tests/test_trust_gate.py tests/test_trust_gate_integration.py -v
 
-```json
-{
-  "id": "entry_123...",
-  "status": "completed",
-  "amount": "10.00",
-  "recipient": "0x...",
-  "timestamp": "2025-01-14T10:00:00Z",
-  "blockchain_tx": "0xabc...",
-  "metadata": {
-    "purpose": "Coffee",
-    "provider_id": "cctp_uuid_..."
-  }
-}
+# Run all tests
+uv run pytest tests/ -v
 ```
 
-### Accessing History
+### Test Coverage
 
-```python
-# Get full history for a wallet
-history = await client.ledger.get_history(wallet_id=wallet.id)
-
-# Sync a specific entry with the Blockchain (Update status)
-updated_entry = await client.sync_transaction(entry_id="entry_123")
-```
+| Area | Test File | Tests |
+|:-----|:---------|:------|
+| Trust Gate | `test_trust_gate.py` | Policy, scoring, cache, identity, ABI |
+| Trust Gate Integration | `test_trust_gate_integration.py` | 11 real-world scenarios |
+| Guards | `test_guards.py`, `test_guard_edge_cases.py` | All 5 guard types |
+| Circuit Breaker | `test_circuit_breaker.py` | State transitions |
+| Fund Locking | `test_fund_lock.py` | 2PC, mutex, deadlock |
+| Payment Intents | `test_payment_intents.py`, `test_intent_lifecycle.py` | Auth/capture/cancel lifecycle |
+| Concurrency | `test_payment_concurrency.py` | Race conditions |
+| Payment Router | `test_payment_router.py` | Adapter selection |
+| x402 Protocol | `test_x402.py` | HTTP 402 handshake |
+| CCTP/Gateway | `test_gateway.py`, `test_cctp_*.py` | Cross-chain |
+| Simulation | `test_simulation.py` | Dry-run predictions |
+| Webhooks | `test_webhook_verification.py` | Ed25519 signatures |
+| Client | `test_client.py` | SDK entry point |
+| Types | `test_types.py` | Data structures |
+| Ledger | `test_ledger.py` | Audit trail |
 
 ---
 
 ## 🔐 Security & Best Practices
 
-1.  **Environment Variables**: Never hardcode API keys or Entity Secrets. Use `.env`.
-2.  **Least Privilege**: Give agents only the budget they need for the task.
-3.  **Strict Recipient Guards**: If an agent only buys valid server time, whitelist AWS/GCP addresses.
-4.  **Use Intents for High Value**: Requiring a second step for >$1000 eliminates 99% of "catastrophic" AI errors.
-5.  **Monitor Logs**: Run with `log_level=logging.WARNING` in prod, but check alerts on `BLOCKED` payment status.
+1.  **Environment Variables** — Never hardcode API keys or Entity Secrets
+2.  **Least Privilege** — Give agents only the budget they need
+3.  **Strict Recipient Guards** — Whitelist known vendor addresses
+4.  **Use Intents for High Value** — Require 2-step confirmation for >$1000
+5.  **ERC-8004 Trust Gate** — Enable on-chain identity checks for unknown recipients
+6.  **Circuit Breakers** — Wrap all external API calls to prevent cascade failures
+7.  **Monitor Logs** — Run with `WARNING` in prod, alert on `BLOCKED` payments
+8.  **Use Redis in Production** — Memory backend is for development only
 
 ---
 
 ## ⚠️ Error Handling
 
-OmniClaw uses a typed exception hierarchy rooted in `OmniClawError`.
+OmniClaw uses a typed exception hierarchy:
 
-*   `OmniClawError` (Base)
-    *   `ConfigurationError`: Missing keys, bad config.
-    *   `WalletError`: Wallet not found, invalid state.
-    *   `PaymentError` transformation logic failure.
-        *   `InsufficientBalanceError`: Not enough USDC.
-        *   `GuardError`: Blocked by policy.
-        *   `TransactionTimeoutError`: Took too long.
-    *   `NetworkError`: API unreachable.
+```
+OmniClawError (Base)
+├── ConfigurationError     — Missing keys, bad config
+├── WalletError            — Wallet not found, invalid state
+├── PaymentError           — Payment execution failure
+│   ├── InsufficientBalanceError
+│   ├── GuardError         — Blocked by safety policy
+│   └── TransactionTimeoutError
+├── NetworkError           — API unreachable
+├── ValidationError        — Invalid input
+└── CircuitOpenError       — Service circuit tripped
+```
 
-**Retry Strategy:**
-*   `Client` automatically retries `NetworkError` and `5xx` responses.
-*   **DO NOT** retry `GuardError` or `InsufficientBalanceError` without human intervention.
+**Retry Rules:**
+*   ✅ **Auto-retry**: `NetworkError`, `5xx` responses, timeouts
+*   ❌ **Never retry**: `GuardError`, `InsufficientBalanceError`, `ValidationError`
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the community!
-
-1.  **Fork** the repository.
-2.  **Install Dev Deps**: `pip install -e ".[dev]"`
-3.  **Run Tests**: `pytest`
-4.  **Submit PR**: Describe your changes and add tests.
+1.  **Fork** the repository
+2.  **Install**: `pip install -e ".[dev]"`
+3.  **Test**: `uv run pytest tests/ -v`
+4.  **Submit PR** with tests
 
 License: **MIT**

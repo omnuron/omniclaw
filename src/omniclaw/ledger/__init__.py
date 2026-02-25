@@ -10,10 +10,12 @@ from omniclaw.ledger.ledger import (
     LedgerEntryStatus,
     LedgerEntryType,
 )
+from omniclaw.ledger.lock import FundLockService
 
 __all__ = [
     "Ledger",
     "LedgerEntry",
     "LedgerEntryStatus",
     "LedgerEntryType",
+    "FundLockService",
 ]

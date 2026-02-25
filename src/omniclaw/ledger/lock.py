@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -57,14 +56,15 @@ class FundLockService:
             retry_delay: Delay between retries
 
         Returns:
-            lock_id (str) if successful, None if failed
+            lock_token (str) if successful, None if failed
         """
         lock_key = f"lock:wallet:{wallet_id}"
         
         for i in range(retry_count + 1):
-            if await self._storage.acquire_lock(lock_key, ttl):
-                logger.debug(f"Acquired lock for wallet {wallet_id}")
-                return lock_key  # In this simple implementation, key is the ID
+            token = await self._storage.acquire_lock(lock_key, ttl)
+            if token:
+                logger.debug(f"Acquired lock for wallet {wallet_id} (token: {token[:8]}...)")
+                return token
             
             if i < retry_count:
                 logger.debug(f"Wallet {wallet_id} locked, retrying in {retry_delay}s...")
@@ -73,17 +73,19 @@ class FundLockService:
         logger.warning(f"Failed to acquire lock for wallet {wallet_id} after {retry_count} retries")
         return None
 
-    async def release(self, lock_key: str) -> bool:
+    async def release_with_key(self, wallet_id: str, lock_token: str) -> bool:
         """
-        Release a previously acquired lock.
+        Release a previously acquired lock using wallet_id and token.
 
         Args:
-            lock_key: The key returned by acquire()
+            wallet_id: The wallet ID the lock was acquired for
+            lock_token: The ownership token returned by acquire()
 
         Returns:
-            True if released, False if not found
+            True if released, False if not found or token mismatch
         """
-        result = await self._storage.release_lock(lock_key)
+        lock_key = f"lock:wallet:{wallet_id}"
+        result = await self._storage.release_lock(lock_key, lock_token)
         if result:
-            logger.debug(f"Released lock {lock_key}")
+            logger.debug(f"Released lock for wallet {wallet_id}")
         return result

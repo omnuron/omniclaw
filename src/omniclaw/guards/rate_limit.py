@@ -113,11 +113,7 @@ class RateLimitGuard(Guard):
         return json.dumps(token)
 
     async def commit(self, token: str | None) -> None:
-        # Rate limit "cost" is paid on reserve.
-        # Commit validates it but we don't need to do anything extra
-        # unless we want to separate "Pending" vs "Confirmed".
-        # For simplicity, Reserve = Counted.
-        # If transaction fails, Release = Refund.
+        """Commit is a no-op — rate limit cost is counted on reserve, released on rollback."""
         pass
 
     async def release(self, token: str | None) -> None:
@@ -154,9 +150,26 @@ class RateLimitGuard(Guard):
         return int(float(str(val))) if val else 0
 
     async def check(self, context: PaymentContext) -> GuardResult:
-        # Non-atomic check for pre-flight (optional)
-        # Just return True and let reserve handle it
-        return GuardResult(True)
+        """Check if payment would be within rate limits (non-atomic read)."""
+        if not self._storage:
+            return GuardResult(allowed=True, guard_name=self.name)
+
+        wallet_id = context.wallet_id
+        now = datetime.now()
+        window_keys = self._get_window_keys(wallet_id, now)
+
+        for limit_type, key in window_keys.items():
+            limit = getattr(self, f"_max_per_{limit_type}")
+            current = await self._get_count(key)
+            if current >= limit:
+                return GuardResult(
+                    allowed=False,
+                    reason=f"Rate limit exceeded ({limit_type}): {current}/{limit}",
+                    guard_name=self.name,
+                    metadata={"limit_type": limit_type, "current": current, "limit": limit},
+                )
+
+        return GuardResult(allowed=True, guard_name=self.name)
 
     async def record_payment(self, wallet_id: str) -> None:
         # Deprecated

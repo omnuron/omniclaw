@@ -122,8 +122,7 @@ class CircuitBreaker:
             await self.trip()
             return
 
-        # Atomic Increment
-        # We add 1.0 (float) because atomic_add uses floats
+        # Atomic increment via storage backend
         val_str = await self._storage.atomic_add(
             "resilience", self._key_failures, "1"
         )
@@ -144,14 +143,15 @@ class CircuitBreaker:
             self._logger.info("Success in HALF_OPEN. Closing circuit.")
             await self.close()
         elif state == CircuitState.CLOSED:
-            # Optional: Reset failure count periodically or on success?
-            # For strict circuit breakers, success usually resets the count
-            # or we rely on a rolling window.
-            # Here we do a probabilistic reset or explicit reset to keep it healthy.
-            # Accessing atomic counters to set to 0 is hard in generic backend.
-            # We assume the rolling window (TTL) handles standard cleanup,
-            # or we explicitly delete the key.
-            await self._storage.delete("resilience", self._key_failures)
+            # Decrement failure count by 1 (gradual recovery rather than instant reset)
+            # This prevents a single success from wiping out a burst of recent failures
+            val_str = await self._storage.atomic_add(
+                "resilience", self._key_failures, "-1"
+            )
+            current = int(float(val_str))
+            if current <= 0:
+                # Clean up when count reaches zero
+                await self._storage.delete("resilience", self._key_failures)
 
     async def trip(self) -> None:
         """Trip the circuit to OPEN."""
@@ -185,8 +185,7 @@ class CircuitBreaker:
         if exc_type is None:
             await self.record_success()
         else:
-            # We only count specific exceptions as infrastructure failures?
-            # Or all? For now, assume all exceptions raised through here are failures.
-            # The caller should catch business logic errors (400s) outside this block.
+            # All exceptions within the circuit context are treated as infrastructure failures.
+            # Business logic errors (e.g. validation) should be caught outside the circuit block.
             await self.record_failure()
             return False  # Propagate exception

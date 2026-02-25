@@ -36,6 +36,8 @@ from omniclaw.core.types import (
     Balance,
     FeeLevel,
     Network,
+    PaymentIntent,
+    PaymentIntentStatus,
     PaymentMethod,
     PaymentRequest,
     PaymentResult,
@@ -69,6 +71,16 @@ from omniclaw.onboarding import (
     verify_setup,
 )
 
+# ERC-8004 Trust Layer
+from omniclaw.identity.types import (
+    AgentIdentity,
+    ReputationScore,
+    TrustCheckResult,
+    TrustPolicy,
+    TrustVerdict,
+)
+from omniclaw.trust.gate import TrustGate
+
 __version__ = "0.0.1"
 __all__ = [
     # Main Client
@@ -78,7 +90,6 @@ __all__ = [
     "ensure_setup",
     "generate_entity_secret",
     "verify_setup",
-
     "print_setup_status",
     "find_recovery_file",
     "get_config_dir",
@@ -95,6 +106,8 @@ __all__ = [
     "PaymentResult",
     "SimulationResult",
     "TransactionInfo",
+    "PaymentIntent",
+    "PaymentIntentStatus",
     # Config
     "Config",
     # Exceptions
@@ -117,4 +130,11 @@ __all__ = [
     "RecipientGuard",
     "RateLimitGuard",
     "ConfirmGuard",
+    # ERC-8004 Trust Layer
+    "TrustGate",
+    "TrustPolicy",
+    "TrustVerdict",
+    "TrustCheckResult",
+    "AgentIdentity",
+    "ReputationScore",
 ]

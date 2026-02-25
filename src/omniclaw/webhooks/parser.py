@@ -171,13 +171,11 @@ class WebhookParser:
         except ValueError:
             event_type = NotificationType.UNKNOWN
 
-        # Extract Timestamp
-        # Circle sends "customDate" or we use current time if missing
+        # Extract Timestamp from Circle's customDate field, falling back to current time
         timestamp = datetime.utcnow()
         if "customDate" in data:
             with contextlib.suppress(Exception):
-                # Parse ISO format if possible
-                pass
+                timestamp = datetime.fromisoformat(data["customDate"])
 
         return WebhookEvent(
             id=data.get("notificationId", "unknown"),

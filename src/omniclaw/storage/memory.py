@@ -165,9 +165,10 @@ class InMemoryStorage(StorageBackend):
         self,
         key: str,
         ttl: int = 30,
-    ) -> bool:
-        """Acquire lock (simple in-memory implementation)."""
+    ) -> str | None:
+        """Acquire lock with ownership token (in-memory implementation)."""
         import time
+        import uuid
         
         # Use a hidden collection for locks
         if "_locks" not in self._data:
@@ -178,25 +179,31 @@ class InMemoryStorage(StorageBackend):
         
         # Check if lock exists and is valid
         if key in locks:
-            expiry = locks[key]
+            lock_info = locks[key]
             # If expiry is in future, it's locked
-            if now < float(expiry):
-                return False 
+            if now < lock_info["expiry"]:
+                return None 
             
-        # Set lock (acquire)
-        locks[key] = now + ttl
-        return True
+        # Set lock (acquire) with unique token
+        token = str(uuid.uuid4())
+        locks[key] = {"token": token, "expiry": now + ttl}
+        return token
 
     async def release_lock(
         self,
         key: str,
+        token: str | None = None,
     ) -> bool:
-        """Release lock."""
+        """Release lock only if token matches."""
         if "_locks" not in self._data:
             return False
             
         locks = self._data["_locks"]
         if key in locks:
+            lock_info = locks[key]
+            # If token provided, verify ownership
+            if token and lock_info.get("token") != token:
+                return False
             del locks[key]
             return True
         return False

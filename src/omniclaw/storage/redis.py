@@ -134,42 +134,64 @@ class RedisStorage(StorageBackend):
 
         return str(new_val)
 
+    # Lua script for safe lock release: only delete if token matches
+    _RELEASE_LOCK_SCRIPT = """
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+    else
+        return 0
+    end
+    """
+
     async def acquire_lock(
         self,
         key: str,
         ttl: int = 30,
-    ) -> bool:
+    ) -> str | None:
         """
-        Acquire a distributed lock (Redis SET NX).
+        Acquire a distributed lock with ownership token (Redis SET NX).
 
         Args:
             key: Lock key (e.g. "lock:wallet:123")
             ttl: TTL in seconds
 
         Returns:
-            True if acquired
+            Unique ownership token if acquired, None if already held
         """
+        import uuid
+
         client = self._get_client()
-        # Use a dedicated lock prefix to avoid collision with collections
         redis_key = f"{self._prefix}:locks:{key}"
+        token = str(uuid.uuid4())
         
-        # SET key value NX EX ttl
-        # value="1" is arbitrary
-        result = await client.set(redis_key, "1", nx=True, ex=ttl)
-        return bool(result)
+        # SET key token NX EX ttl
+        result = await client.set(redis_key, token, nx=True, ex=ttl)
+        if result:
+            return token
+        return None
 
     async def release_lock(
         self,
         key: str,
+        token: str | None = None,
     ) -> bool:
-        """Release a lock."""
+        """
+        Release a lock safely using Lua script.
+        
+        Only deletes the key if the stored value matches our token,
+        preventing accidental release of another caller's lock.
+        """
         client = self._get_client()
         redis_key = f"{self._prefix}:locks:{key}"
         
-        # Simple delete. 
-        # In a strict mutex, we'd check ownership, but here we trust the caller.
-        result = await client.delete(redis_key)
-        return result > 0
+        if token:
+            # Safe release: atomic check-and-delete via Lua
+            result = await client.eval(self._RELEASE_LOCK_SCRIPT, 1, redis_key, token)
+            return int(result) > 0
+        else:
+            # Fallback: simple delete (legacy callers)
+            result = await client.delete(redis_key)
+            return result > 0
 
     async def query(
         self,

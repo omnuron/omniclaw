@@ -187,15 +187,7 @@ class Ledger:
 
         if metadata_updates:
             # Need to get current metadata first to merge?
-            # StorageBackend.update might be partial?
-            # Default Redis/Memory update usually merges top-level keys.
-            # But metadata is a nested dict key.
-            # Safe way: read, merge locally, save back?
-            # Or assume storage backend update is naive.
-            # Memory backend update does `existing.update(values)`.
-            # So `metadata` key would be overwritten if we pass `metadata`.
-            # We should load current metadata if we want to merge.
-            # But `data` is available here.
+            # Merge metadata updates into existing metadata (read-modify-write)
             current_metadata = data.get("metadata", {})
             current_metadata.update(metadata_updates)
             updates["metadata"] = current_metadata

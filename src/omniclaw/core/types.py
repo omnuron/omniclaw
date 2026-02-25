@@ -410,6 +410,9 @@ class PaymentIntent:
     status: PaymentIntentStatus
     created_at: datetime
     expires_at: datetime | None = None
+    purpose: str | None = None
+    cancel_reason: str | None = None
+    reserved_amount: Decimal | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     client_secret: str | None = None
 
@@ -423,6 +426,9 @@ class PaymentIntent:
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "purpose": self.purpose,
+            "cancel_reason": self.cancel_reason,
+            "reserved_amount": str(self.reserved_amount) if self.reserved_amount is not None else None,
             "metadata": self.metadata,
             "client_secret": self.client_secret,
         }
@@ -440,6 +446,9 @@ class PaymentIntent:
             expires_at=datetime.fromisoformat(data["expires_at"])
             if data.get("expires_at")
             else None,
+            purpose=data.get("purpose"),
+            cancel_reason=data.get("cancel_reason"),
+            reserved_amount=Decimal(data["reserved_amount"]) if data.get("reserved_amount") else None,
             metadata=data.get("metadata", {}),
             client_secret=data.get("client_secret"),
         )
@@ -468,10 +477,21 @@ class SimulationResult:
 
     would_succeed: bool
     route: PaymentMethod
+    recipient_type: str | None = None
     guards_that_would_pass: list[str] = field(default_factory=list)
     guards_that_would_fail: list[str] = field(default_factory=list)
     estimated_fee: Decimal | None = None
     reason: str | None = None
+
+    @property
+    def estimated_gas(self) -> Decimal | None:
+        """Alias for estimated_fee for API compatibility."""
+        return self.estimated_fee
+
+    @property
+    def guards_that_pass(self) -> list[str]:
+        """Alias for API compatibility with vision document."""
+        return self.guards_that_would_pass
 
 
 @dataclass

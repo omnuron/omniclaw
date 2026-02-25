@@ -41,6 +41,8 @@ class PaymentIntentService:
         recipient: str,
         amount: Decimal,
         currency: str = "USDC",
+        purpose: str | None = None,
+        expires_in: int | None = None,
         metadata: dict[str, Any] | None = None,
         client_secret: str | None = None,
     ) -> PaymentIntent:
@@ -52,13 +54,22 @@ class PaymentIntentService:
             recipient: Payment recipient
             amount: Amount to pay
             currency: Currency code (default USDC)
+            purpose: Human-readable purpose
+            expires_in: Time to live in seconds
             metadata: Additional metadata
             client_secret: Optional client secret for future use
 
         Returns:
             PaymentIntent instance
         """
+        import datetime as dt
+
         intent_id = str(uuid.uuid4())
+        created_at = datetime.utcnow()
+        expires_at = None
+        if expires_in is not None:
+            expires_at = created_at + dt.timedelta(seconds=expires_in)
+
         intent = PaymentIntent(
             id=intent_id,
             wallet_id=wallet_id,
@@ -66,7 +77,9 @@ class PaymentIntentService:
             amount=amount,
             currency=currency,
             status=PaymentIntentStatus.REQUIRES_CONFIRMATION,
-            created_at=datetime.utcnow(),
+            created_at=created_at,
+            expires_at=expires_at,
+            purpose=purpose,
             metadata=metadata or {},
             client_secret=client_secret,
         )
@@ -94,6 +107,27 @@ class PaymentIntentService:
             raise ValidationError(f"Intent not found: {intent_id}")
 
         intent.status = status
+        await self._save(intent)
+        return intent
+
+    async def cancel(self, intent_id: str, reason: str | None = None) -> PaymentIntent:
+        """
+        Cancel a payment intent.
+
+        Args:
+            intent_id: Intent ID
+            reason: Optional reason for cancellation
+
+        Raises:
+            ValidationError: If intent not found
+        """
+        intent = await self.get(intent_id)
+        if not intent:
+            raise ValidationError(f"Intent not found: {intent_id}")
+
+        intent.status = PaymentIntentStatus.CANCELED
+        if reason:
+            intent.cancel_reason = reason
         await self._save(intent)
         return intent
 

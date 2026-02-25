@@ -169,16 +169,16 @@ class StorageBackend(ABC):
         self,
         key: str,
         ttl: int = 30,
-    ) -> bool:
+    ) -> str | None:
         """
-        Acquire a distributed lock.
+        Acquire a distributed lock with ownership token.
 
         Args:
             key: Lock key (unique resource identifier)
             ttl: Time-to-live in seconds (lock auto-release)
 
         Returns:
-            True if lock acquired, False if already held
+            Unique ownership token if acquired, None if already held
         """
         ...
 
@@ -186,15 +186,19 @@ class StorageBackend(ABC):
     async def release_lock(
         self,
         key: str,
+        token: str | None = None,
     ) -> bool:
         """
         Release a distributed lock.
 
+        Only releases if the provided token matches the one used to acquire.
+
         Args:
             key: Lock key
+            token: Ownership token from acquire_lock (required for safe release)
 
         Returns:
-            True if lock released, False if not found
+            True if lock released, False if not found or token mismatch
         """
         ...
 

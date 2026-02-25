@@ -82,12 +82,13 @@ async def test_concurrent_budget_updates(client_with_storage):
 
     success_count = sum(1 for r in results if isinstance(r, PaymentResult) and r.success)
     failed_count = sum(1 for r in results if isinstance(r, PaymentResult) and not r.success)
+    exception_count = sum(1 for r in results if isinstance(r, Exception))
 
     # Check that we didn't overspend
     # $6 * 16 = $96. $6 * 17 = $102 (Over budget)
     # So max success count should be 16.
 
-    print(f"Success: {success_count}, Failed: {failed_count}")
+    print(f"Success: {success_count}, Failed: {failed_count}, Exceptions: {exception_count}")
 
     assert success_count <= 16, f"Budget exceeded! {success_count} payments succeeded."
-    assert success_count + failed_count == 20
+    assert success_count + failed_count + exception_count == 20

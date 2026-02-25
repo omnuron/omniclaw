@@ -87,7 +87,6 @@ class RecipientGuard(Guard):
                 return True
 
         # Check regex patterns
-        # Check regex patterns
         return any(pattern.search(recipient) for pattern in self._patterns)
 
     async def check(self, context: PaymentContext) -> GuardResult:

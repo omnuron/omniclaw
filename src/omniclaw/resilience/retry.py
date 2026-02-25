@@ -13,7 +13,7 @@ try:
     from tenacity import (
         AsyncRetrying,
         retry,
-        retry_if_exception_type,
+        retry_if_exception,
         stop_after_attempt,
         wait_exponential,
     )
@@ -25,14 +25,13 @@ except ImportError:
         return decorator
     
     AsyncRetrying = None
-    retry_if_exception_type = None
+    retry_if_exception = None
     stop_after_attempt = None
     wait_exponential = None
 
 
 def is_transient_error(exception: Exception) -> bool:
     """Check if exception is a transient network/infrastructure error."""
-    # This is a heuristic. We'll refine it with specific SDK errors later.
     msg = str(exception).lower()
     return any(
         x in msg
@@ -53,7 +52,7 @@ def is_transient_error(exception: Exception) -> bool:
 # Retries 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s)
 # Only on transient errors.
 retry_policy = retry(
-    retry=retry_if_exception_type(Exception) & retry_if_exception_type(is_transient_error),
+    retry=retry_if_exception(is_transient_error),
     wait=wait_exponential(multiplier=1, min=1, max=16),
     stop=stop_after_attempt(5),
     reraise=True,
@@ -70,7 +69,7 @@ async def execute_with_retry(
 ) -> Any:
     """Execute an async function with standard retry policy."""
     async for attempt in AsyncRetrying(
-        retry=retry_if_exception_type(Exception) & retry_if_exception_type(is_transient_error),
+        retry=retry_if_exception(is_transient_error),
         wait=wait_exponential(multiplier=1, min=1, max=16),
         stop=stop_after_attempt(5),
         reraise=True,

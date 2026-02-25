@@ -220,6 +220,8 @@ class TestSimulate:
 
     @pytest.mark.asyncio
     async def test_simulate_blocked_by_guard(self, client):
+        client._wallet_service.get_usdc_balance_amount = lambda wid: Decimal("100.00")
+        
         # Add guard for this wallet
         await client.guards.add_guard(
             "wallet-123",
