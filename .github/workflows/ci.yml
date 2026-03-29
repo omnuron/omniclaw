@@ -33,7 +33,6 @@ jobs:
 
       - name: Ruff format check
         run: uv run ruff format --check src/
-        continue-on-error: true
 
   typecheck:
     name: Type Check
@@ -53,7 +52,7 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: mypy
-        run: uv run mypy src/omniclaw --ignore-missing-imports || true
+        run: uv run mypy src/omniclaw --ignore-missing-imports
         continue-on-error: true
 
   test:
