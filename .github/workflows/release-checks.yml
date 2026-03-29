@@ -1,0 +1,45 @@
+name: Release Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Build package
+        run: uv build
+
+      - name: Verify package contents
+        run: |
+          ls -la dist/
+          # Ensure both sdist and wheel were created
+          test -f dist/*.tar.gz
+          test -f dist/*.whl
+
+      - name: Check package metadata
+        run: |
+          pip install --break-system-packages twine
+          twine check dist/*
+
+      - name: Test install from wheel
+        run: |
+          pip install --break-system-packages dist/*.whl
+          python -c "import omniclaw; print(f'omniclaw installed successfully')"
