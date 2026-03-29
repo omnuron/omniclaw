@@ -8,3 +8,5 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+# See: https://docs.astral.sh/ruff/
