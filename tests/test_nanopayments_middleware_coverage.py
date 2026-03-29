@@ -413,6 +413,7 @@ class TestRequire:
     @pytest.mark.asyncio
     async def test_require_returns_dependency_function(self):
         """Lines 424-450: require() returns a function that can be used as FastAPI dependency."""
+        pytest.importorskip("fastapi")
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(_make_kinds()),
@@ -434,7 +435,6 @@ class TestRequire:
 
         # When called, should raise HTTPException (not PaymentRequiredHTTPError)
         # because the dependency wraps it
-        from fastapi import HTTPException
 
         # The dependency should call parse_price internally
         # If parse_price fails, it should propagate
@@ -449,6 +449,7 @@ class TestRequire:
     @pytest.mark.asyncio
     async def test_require_dependency_calls_handle(self):
         """The dependency calls handle() with headers and price."""
+        pytest.importorskip("fastapi")
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(_make_kinds()),
@@ -505,6 +506,7 @@ class TestRequire:
     @pytest.mark.asyncio
     async def test_require_dependency_wraps_402_to_http_exception(self):
         """Lines 443-448: Wraps PaymentRequiredHTTPError to HTTPException."""
+        pytest.importorskip("fastapi")
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(_make_kinds()),
