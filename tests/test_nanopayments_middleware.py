@@ -119,94 +119,94 @@ def _make_client() -> MagicMock:
 class TestGatewayMiddleware:
     """Tests for GatewayMiddleware 402 response structure."""
 
-    def test_402_body_has_correct_x402_version(self):
+    async def test_402_body_has_correct_x402_version(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         assert body["x402Version"] == X402_VERSION
 
-    def test_402_body_has_correct_scheme(self):
+    async def test_402_body_has_correct_scheme(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert accept["scheme"] == "exact"
 
-    def test_402_body_max_timeout_is_345600(self):
+    async def test_402_body_max_timeout_is_345600(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert accept["maxTimeoutSeconds"] == MAX_TIMEOUT_SECONDS == 345600
 
-    def test_402_body_has_gateway_wallet_batched(self):
+    async def test_402_body_has_gateway_wallet_batched(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert accept["extra"]["name"] == "GatewayWalletBatched"
 
-    def test_402_body_has_verifying_contract(self):
+    async def test_402_body_has_verifying_contract(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert "verifyingContract" in accept["extra"]
             assert accept["extra"]["verifyingContract"].startswith("0x")
 
-    def test_402_body_has_correct_amount(self):
+    async def test_402_body_has_correct_amount(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert accept["amount"] == "1000"  # 0.001 * 1_000_000
 
-    def test_402_body_pay_to_is_seller_address(self):
+    async def test_402_body_pay_to_is_seller_address(self):
         seller = "0x" + "a" * 40
         middleware = GatewayMiddleware(
             seller_address=seller,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         for accept in body["accepts"]:
             assert accept["payTo"] == seller
 
-    def test_402_body_one_entry_per_network(self):
+    async def test_402_body_one_entry_per_network(self):
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$1.00")
+        body = await middleware._build_402_response("$1.00")
         assert len(body["accepts"]) == 2
 
-    def test_payment_required_header_is_valid_base64(self):
+    async def test_payment_required_header_is_valid_base64(self):
         """PAYMENT-REQUIRED header must be valid base64."""
         middleware = GatewayMiddleware(
             seller_address="0x" + "a" * 40,
             nanopayment_client=_make_client(),
             supported_kinds=_make_kinds(),
         )
-        body = middleware._build_402_response("$0.001")
+        body = await middleware._build_402_response("$0.001")
         header = middleware._encode_requirements(body)
 
         decoded = base64.b64decode(header)
