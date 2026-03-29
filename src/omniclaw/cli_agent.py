@@ -9,10 +9,9 @@ warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 import base64
 import json
 import os
-import sys
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import typer
@@ -40,7 +39,7 @@ def save_config(config: dict[str, Any]) -> None:
 
 def get_client() -> httpx.Client:
     """Get HTTP client with auth."""
-    config = load_config()
+    _config = load_config()
     server_url = config.get("server_url", os.environ.get("OMNICLAW_SERVER_URL"))
     token = config.get("token", os.environ.get("OMNICLAW_TOKEN"))
 
@@ -64,7 +63,7 @@ def configure(
 ) -> None:
     """Configure omniclaw-cli with server details."""
     if show:
-        config = load_config()
+        _config = load_config()
         if not config:
             typer.echo("No configuration found. Run 'omniclaw-cli configure --server-url ...'")
             return
@@ -86,7 +85,7 @@ def configure(
 def address() -> dict[str, Any]:
     """Get wallet address."""
     client = get_client()
-    config = load_config()
+    _config = load_config()
 
     try:
         response = client.get("/api/v1/address")
@@ -157,7 +156,7 @@ def pay(
 
     # If recipient is a URL, handle x402 flow
     if recipient.startswith("http"):
-        typer.echo(f"🚀 Paying for x402 service: {recipient}")
+        typer.echo(f"ð Paying for x402 service: {recipient}")
         payload: dict[str, Any] = {
             "url": recipient,
             "method": method,
@@ -175,7 +174,7 @@ def pay(
             data = response.json()
             if output:
                 Path(output).write_text(json.dumps(data, indent=2))
-                typer.echo(f"✅ Response saved to {output}")
+                typer.echo(f"â Response saved to {output}")
             else:
                 typer.echo(json.dumps(data, indent=2))
             return data
@@ -386,7 +385,7 @@ def get_intent(
 @app.command()
 def cancel_intent(
     intent_id: str = typer.Option(..., "--intent-id", help="Intent ID to cancel"),
-    reason: Optional[str] = typer.Option(None, "--reason", help="Cancel reason"),
+    reason: str | None = typer.Option(None, "--reason", help="Cancel reason"),
 ) -> dict[str, Any]:
     """Cancel a payment intent."""
     client = get_client()
@@ -437,7 +436,7 @@ def serve(
 ) -> None:
     """Expose a local service behind an x402 payment gate."""
     import uvicorn
-    from fastapi import FastAPI, Response, Request
+    from fastapi import FastAPI, Request, Response
     from fastapi.responses import JSONResponse
 
     server_app = FastAPI()
@@ -449,9 +448,9 @@ def serve(
         sig = request.headers.get("PAYMENT-SIGNATURE")
         if not sig:
             # Return 402 with requirements
-            config = load_config()
+            _config = load_config()
             wallet_addr = client.get("/api/v1/address").json().get("address")
-            
+
             requirements = {
                 "x402Version": 2,
                 "accepts": [{
@@ -480,7 +479,7 @@ def serve(
             }
             v_resp = client.post("/api/v1/x402/verify", json=verify_payload)
             v_resp.raise_for_status()
-            
+
             if not v_resp.json().get("valid"):
                 return JSONResponse(status_code=402, content={"detail": "Invalid Payment"})
 
@@ -492,7 +491,7 @@ def serve(
             env = os.environ.copy()
             env["OMNICLAW_PAYER_ADDRESS"] = v_resp.json().get("sender", "unknown")
             env["OMNICLAW_AMOUNT_USD"] = str(price)
-            
+
             result = subprocess.run(
                 exec_cmd,
                 shell=True,
@@ -504,10 +503,10 @@ def serve(
         except Exception as e:
             return JSONResponse(status_code=500, content={"detail": f"Execution failed: {e}"})
 
-    typer.echo(f"🌐 OmniClaw Service exposed at http://localhost:{port}{endpoint}")
-    typer.echo(f"💰 Price: ${price} USDC")
-    typer.echo(f"🛠️ Exec: {exec_cmd}")
-    
+    typer.echo(f"ð OmniClaw Service exposed at http://localhost:{port}{endpoint}")
+    typer.echo(f"ð° Price: ${price} USDC")
+    typer.echo(f"ð ï¸ Exec: {exec_cmd}")
+
     uvicorn.run(server_app, host="0.0.0.0", port=port)
 
 
@@ -515,7 +514,7 @@ def serve(
 def status() -> dict[str, Any]:
     """Get agent status and health."""
     client = get_client()
-    config = load_config()
+    _config = load_config()
 
     try:
         # Get multiple stats for a complete status report
@@ -537,8 +536,8 @@ def status() -> dict[str, Any]:
         typer.echo(f"Wallet:    {status_data['Wallet']}")
         typer.echo(f"Balance:   {status_data['Balance']}")
         typer.echo(f"Guards:    {status_data['Guards']}")
-        typer.echo(f"Circle:    {status_data['Circle']} ✓")
-        typer.echo(f"Circuit:   {status_data['Circuit']} ✓")
+        typer.echo(f"Circle:    {status_data['Circle']} â")
+        typer.echo(f"Circuit:   {status_data['Circuit']} â")
 
         return status_data
     except Exception as e:

@@ -6,9 +6,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 
-import logging
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from omniclaw.agent.auth import TokenAuth
 from omniclaw.agent.policy import PolicyManager, WalletManager
 from omniclaw.agent.routes import router
-from omniclaw.core.config import Config
 from omniclaw.core.logging import configure_logging, get_logger
 
 logger = get_logger(__name__)
