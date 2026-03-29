@@ -39,7 +39,7 @@ def save_config(config: dict[str, Any]) -> None:
 
 def get_client() -> httpx.Client:
     """Get HTTP client with auth."""
-    _config = load_config()
+    config = load_config()
     server_url = config.get("server_url", os.environ.get("OMNICLAW_SERVER_URL"))
     token = config.get("token", os.environ.get("OMNICLAW_TOKEN"))
 
@@ -63,7 +63,7 @@ def configure(
 ) -> None:
     """Configure omniclaw-cli with server details."""
     if show:
-        _config = load_config()
+        config = load_config()
         if not config:
             typer.echo("No configuration found. Run 'omniclaw-cli configure --server-url ...'")
             return
@@ -156,7 +156,7 @@ def pay(
 
     # If recipient is a URL, handle x402 flow
     if recipient.startswith("http"):
-        typer.echo(f"ð Paying for x402 service: {recipient}")
+        typer.echo(f"Ã°ÂÂÂ Paying for x402 service: {recipient}")
         payload: dict[str, Any] = {
             "url": recipient,
             "method": method,
@@ -174,7 +174,7 @@ def pay(
             data = response.json()
             if output:
                 Path(output).write_text(json.dumps(data, indent=2))
-                typer.echo(f"â Response saved to {output}")
+                typer.echo(f"Ã¢ÂÂ Response saved to {output}")
             else:
                 typer.echo(json.dumps(data, indent=2))
             return data
@@ -503,9 +503,9 @@ def serve(
         except Exception as e:
             return JSONResponse(status_code=500, content={"detail": f"Execution failed: {e}"})
 
-    typer.echo(f"ð OmniClaw Service exposed at http://localhost:{port}{endpoint}")
-    typer.echo(f"ð° Price: ${price} USDC")
-    typer.echo(f"ð ï¸ Exec: {exec_cmd}")
+    typer.echo(f"Ã°ÂÂÂ OmniClaw Service exposed at http://localhost:{port}{endpoint}")
+    typer.echo(f"Ã°ÂÂÂ° Price: ${price} USDC")
+    typer.echo(f"Ã°ÂÂÂ Ã¯Â¸Â Exec: {exec_cmd}")
 
     uvicorn.run(server_app, host="0.0.0.0", port=port)
 
@@ -514,7 +514,7 @@ def serve(
 def status() -> dict[str, Any]:
     """Get agent status and health."""
     client = get_client()
-    _config = load_config()
+    config = load_config()
 
     try:
         # Get multiple stats for a complete status report
@@ -536,8 +536,8 @@ def status() -> dict[str, Any]:
         typer.echo(f"Wallet:    {status_data['Wallet']}")
         typer.echo(f"Balance:   {status_data['Balance']}")
         typer.echo(f"Guards:    {status_data['Guards']}")
-        typer.echo(f"Circle:    {status_data['Circle']} â")
-        typer.echo(f"Circuit:   {status_data['Circuit']} â")
+        typer.echo(f"Circle:    {status_data['Circle']} Ã¢ÂÂ")
+        typer.echo(f"Circuit:   {status_data['Circuit']} Ã¢ÂÂ")
 
         return status_data
     except Exception as e:
