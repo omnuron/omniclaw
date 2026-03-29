@@ -108,7 +108,7 @@ class PolicyManager:
             self._policy = Policy()
             return self._policy
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
         self._policy = Policy.from_dict(data)
@@ -191,7 +191,7 @@ class WalletManager:
                     agent_name="omniclaw-primary-agent",
                     apply_default_guards=False,
                 )
-            
+
             self._policy.set_wallet_id(wallet.id)
             self._logger.info(f"Wallet successfully initialized: {wallet.id}")
             return {"status": "success", "wallet_id": wallet.id}

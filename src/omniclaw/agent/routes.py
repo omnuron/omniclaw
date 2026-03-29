@@ -366,10 +366,10 @@ async def list_wallets(
     address = await wallet_mgr.get_wallet_address()
     wallet_id = policy_mgr.get_wallet_id()
     policy = policy_mgr.get_policy()
-    
+
     # Send a mock policy block for the CLI display
     policy_dict = policy.to_dict()
-    
+
     wallets = [
         WalletInfo(
             alias="primary",
@@ -391,7 +391,7 @@ async def x402_pay(
     try:
         from omniclaw.protocols.x402 import X402Adapter
         adapter = X402Adapter(client.config, client.wallet_service)
-        
+
         result = await adapter.execute(
             wallet_id=agent.wallet_id,
             recipient=request.url,
