@@ -101,7 +101,9 @@ class PolicyEngine:
         if reputation and "fraud" in reputation.flags:
             result.verdict = policy.fraud_tag_action
             result.block_reason = "FRAUD_TAG"
-            logger.warning(f"Trust {policy.fraud_tag_action.value}: fraud tag on agent {recipient_address}")
+            logger.warning(
+                f"Trust {policy.fraud_tag_action.value}: fraud tag on agent {recipient_address}"
+            )
             return result
 
         # ─── Check 5: New Agent ──────────────────────────────────────
@@ -119,8 +121,7 @@ class PolicyEngine:
             result.verdict = TrustVerdict.HELD
             result.block_reason = "INSUFFICIENT_FEEDBACK"
             logger.info(
-                f"Trust HELD: {actual_sample} feedback < "
-                f"required {policy.min_feedback_count}"
+                f"Trust HELD: {actual_sample} feedback < required {policy.min_feedback_count}"
             )
             return result
 
@@ -134,10 +135,7 @@ class PolicyEngine:
             return result
 
         # ─── Check 8: High-Value WTS ─────────────────────────────────
-        if (
-            policy.high_value_threshold_usd > 0
-            and amount >= policy.high_value_threshold_usd
-        ):
+        if policy.high_value_threshold_usd > 0 and amount >= policy.high_value_threshold_usd:
             hv_wts = reputation.wts if reputation else 0
             if hv_wts < policy.high_value_min_wts:
                 result.verdict = TrustVerdict.HELD
@@ -175,9 +173,7 @@ class PolicyEngine:
         """Check if agent's organization is in the whitelist."""
         if not policy.org_whitelist or not identity.organization:
             return False
-        return identity.organization.lower() in {
-            o.lower() for o in policy.org_whitelist
-        }
+        return identity.organization.lower() in {o.lower() for o in policy.org_whitelist}
 
 
 __all__ = ["PolicyEngine"]

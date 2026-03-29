@@ -681,6 +681,7 @@ class PaymentInfo:
     def amount_decimal(self) -> str:
         """Amount as decimal USDC string."""
         from decimal import Decimal
+
         return str(Decimal(self.amount) / Decimal("1000000"))
 
     def to_dict(self) -> dict[str, Any]:

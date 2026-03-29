@@ -114,7 +114,7 @@ def balance() -> dict[str, Any]:
         return data
     except httpx.HTTPStatusError as e:
         try:
-            detail = e.response.json().get('detail', str(e))
+            detail = e.response.json().get("detail", str(e))
         except Exception:
             detail = e.response.text or str(e)
         typer.echo(f"Error: {detail}", err=True)
@@ -127,11 +127,17 @@ def balance() -> dict[str, Any]:
 @app.command()
 def pay(
     recipient: str = typer.Option(..., "--recipient", help="Payment recipient (address or URL)"),
-    amount: str | None = typer.Option(None, "--amount", help="Amount in USDC (optional for x402 URLs)"),
+    amount: str | None = typer.Option(
+        None, "--amount", help="Amount in USDC (optional for x402 URLs)"
+    ),
     purpose: str | None = typer.Option(None, "--purpose", help="Payment purpose"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
     method: str = typer.Option("GET", "--method", help="HTTP method for x402 requests"),
@@ -226,8 +232,12 @@ def simulate(
     recipient: str = typer.Option(..., "--recipient", help="Recipient to simulate"),
     amount: str = typer.Option(..., "--amount", help="Amount to simulate"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
 ) -> dict[str, Any]:
@@ -299,8 +309,12 @@ def create_intent(
     purpose: str | None = typer.Option(None, "--purpose", help="Purpose"),
     expires_in: int | None = typer.Option(None, "--expires-in", help="Expiry in seconds"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
 ) -> dict[str, Any]:
@@ -453,18 +467,20 @@ def serve(
 
             requirements = {
                 "x402Version": 2,
-                "accepts": [{
-                    "scheme": "exact",
-                    "network": "eip155:5042002", # ARC Testnet
-                    "amount": str(int(price * 10**6)),
-                    "payTo": wallet_addr,
-                }]
+                "accepts": [
+                    {
+                        "scheme": "exact",
+                        "network": "eip155:5042002",  # ARC Testnet
+                        "amount": str(int(price * 10**6)),
+                        "payTo": wallet_addr,
+                    }
+                ],
             }
             encoded = base64.b64encode(json.dumps(requirements).encode()).decode()
             return JSONResponse(
                 status_code=402,
                 content={"detail": "Payment Required"},
-                headers={"PAYMENT-REQUIRED": encoded}
+                headers={"PAYMENT-REQUIRED": encoded},
             )
 
         # 2. Verify payment with OmniClaw Server
@@ -474,8 +490,8 @@ def serve(
             verify_payload = {
                 "signature": sig,
                 "amount": str(price),
-                "sender": "unknown", # extracted from sig later
-                "resource": str(request.url)
+                "sender": "unknown",  # extracted from sig later
+                "resource": str(request.url),
             }
             v_resp = client.post("/api/v1/x402/verify", json=verify_payload)
             v_resp.raise_for_status()
@@ -492,13 +508,7 @@ def serve(
             env["OMNICLAW_PAYER_ADDRESS"] = v_resp.json().get("sender", "unknown")
             env["OMNICLAW_AMOUNT_USD"] = str(price)
 
-            result = subprocess.run(
-                exec_cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                env=env
-            )
+            result = subprocess.run(exec_cmd, shell=True, capture_output=True, text=True, env=env)
             return Response(content=result.stdout, media_type="text/plain")
         except Exception as e:
             return JSONResponse(status_code=500, content={"detail": f"Execution failed: {e}"})

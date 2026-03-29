@@ -59,4 +59,3 @@ def backfill_ledger_entries(entries: list[dict[str, Any]]) -> tuple[list[dict[st
         if changed:
             changed_count += 1
     return normalized_entries, changed_count
-

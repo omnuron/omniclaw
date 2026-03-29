@@ -51,7 +51,13 @@ class GatewayAdapter(ProtocolAdapter):
         """Return payment method type."""
         return PaymentMethod.CROSSCHAIN
 
-    def supports(self, recipient: str, source_network: Network | str | None = None, destination_chain: Network | str | None = None, **kwargs: Any) -> bool:
+    def supports(
+        self,
+        recipient: str,
+        source_network: Network | str | None = None,
+        destination_chain: Network | str | None = None,
+        **kwargs: Any,
+    ) -> bool:
         """Check if this is a valid cross-chain transfer request."""
         if destination_chain is None:
             return False
@@ -136,17 +142,23 @@ class GatewayAdapter(ProtocolAdapter):
                 # Backward compatibility for tests/mocks that return a raw tx object
                 if not hasattr(transfer_result, "success"):
                     raw_tx = transfer_result
-                    transfer_result = type("GatewayTransferResult", (), {
-                        "success": True,
-                        "transaction": raw_tx,
-                        "tx_hash": getattr(raw_tx, "tx_hash", None),
-                        "error": None,
-                    })()
+                    transfer_result = type(
+                        "GatewayTransferResult",
+                        (),
+                        {
+                            "success": True,
+                            "transaction": raw_tx,
+                            "tx_hash": getattr(raw_tx, "tx_hash", None),
+                            "error": None,
+                        },
+                    )()
 
                 if not transfer_result.success:
                     return PaymentResult(
                         success=False,
-                        transaction_id=transfer_result.transaction.id if transfer_result.transaction else None,
+                        transaction_id=transfer_result.transaction.id
+                        if transfer_result.transaction
+                        else None,
                         blockchain_tx=transfer_result.tx_hash,
                         amount=amount,
                         recipient=recipient,
@@ -168,7 +180,9 @@ class GatewayAdapter(ProtocolAdapter):
                         TransactionState.CANCELLED,
                     ):
                         tx_status = (
-                            PaymentStatus.FAILED_FINAL if strict_settlement else PaymentStatus.FAILED
+                            PaymentStatus.FAILED_FINAL
+                            if strict_settlement
+                            else PaymentStatus.FAILED
                         )
                     elif wait_for_completion:
                         tx_status = (
@@ -191,8 +205,12 @@ class GatewayAdapter(ProtocolAdapter):
                     method=self.method,
                     status=tx_status,
                     metadata={
-                        "source_network": source_network.value if hasattr(source_network, 'value') else str(source_network),
-                        "destination_network": destination_chain.value if hasattr(destination_chain, 'value') else str(destination_chain),
+                        "source_network": source_network.value
+                        if hasattr(source_network, "value")
+                        else str(source_network),
+                        "destination_network": destination_chain.value
+                        if hasattr(destination_chain, "value")
+                        else str(destination_chain),
                         "destination_address": destination_address,
                         "purpose": purpose,
                         "same_chain": True,
@@ -210,8 +228,12 @@ class GatewayAdapter(ProtocolAdapter):
                     status=PaymentStatus.FAILED,
                     error=f"Same-chain transfer failed: {e}",
                     metadata={
-                        "source_network": source_network.value if hasattr(source_network, 'value') else str(source_network),
-                        "destination_network": destination_chain.value if hasattr(destination_chain, 'value') else str(destination_chain),
+                        "source_network": source_network.value
+                        if hasattr(source_network, "value")
+                        else str(source_network),
+                        "destination_network": destination_chain.value
+                        if hasattr(destination_chain, "value")
+                        else str(destination_chain),
                         "destination_address": destination_address,
                         "purpose": purpose,
                     },
@@ -248,7 +270,6 @@ class GatewayAdapter(ProtocolAdapter):
                         "purpose": purpose,
                     },
                 )
-
 
     async def _execute_cctp_transfer(
         self,
@@ -341,10 +362,12 @@ class GatewayAdapter(ProtocolAdapter):
         if source_network == Network.ARC_TESTNET:
             use_fast_transfer = False
             finality_threshold = STANDARD_TRANSFER_THRESHOLD
-            max_fee = 0 # Force manual mint to avoid revert risks
+            max_fee = 0  # Force manual mint to avoid revert risks
             transfer_mode = "Standard Transfer (~13-19m)"
         else:
-            finality_threshold = FAST_TRANSFER_THRESHOLD if use_fast_transfer else STANDARD_TRANSFER_THRESHOLD
+            finality_threshold = (
+                FAST_TRANSFER_THRESHOLD if use_fast_transfer else STANDARD_TRANSFER_THRESHOLD
+            )
             fallback_max_fee = DEFAULT_MAX_FEE if use_fast_transfer else 0
             max_fee = await self._resolve_cctp_max_fee(
                 source_network=source_network,
@@ -354,7 +377,9 @@ class GatewayAdapter(ProtocolAdapter):
                 amount_units=amount_units,
                 fallback_fee=fallback_max_fee,
             )
-            transfer_mode = "Fast Transfer (~2-5s)" if use_fast_transfer else "Standard Transfer (~13-19m)"
+            transfer_mode = (
+                "Fast Transfer (~2-5s)" if use_fast_transfer else "Standard Transfer (~13-19m)"
+            )
 
         # Gas check (except Arc)
         if source_network != Network.ARC_TESTNET:
@@ -464,13 +489,13 @@ class GatewayAdapter(ProtocolAdapter):
                 contract_address=token_messenger,
                 abi_function_signature="depositForBurn(uint256,uint32,bytes32,address,bytes32,uint256,uint32)",
                 abi_parameters=[
-                    str(amount_units),           # amount
-                    str(dest_domain),            # destinationDomain
-                    dest_address_bytes32,        # mintRecipient
-                    usdc_address,                # burnToken
-                    EMPTY_DESTINATION_CALLER,    # destinationCaller (0x00 = any)
-                    str(max_fee),                # maxFee
-                    str(finality_threshold),     # minFinalityThreshold
+                    str(amount_units),  # amount
+                    str(dest_domain),  # destinationDomain
+                    dest_address_bytes32,  # mintRecipient
+                    usdc_address,  # burnToken
+                    EMPTY_DESTINATION_CALLER,  # destinationCaller (0x00 = any)
+                    str(max_fee),  # maxFee
+                    str(finality_threshold),  # minFinalityThreshold
                 ],
                 fee_level=fee_level,
             )
@@ -506,10 +531,7 @@ class GatewayAdapter(ProtocolAdapter):
                             method=self.method,
                             status=PaymentStatus.FAILED,
                             error="Burn transaction reverted on blockchain (Check gas/parameters)",
-                            metadata={
-                                "burn_tx_id": burn_tx.id,
-                                "burn_tx_state": updated_tx.state
-                            }
+                            metadata={"burn_tx_id": burn_tx.id, "burn_tx_state": updated_tx.state},
                         )
                     break
 
@@ -529,7 +551,9 @@ class GatewayAdapter(ProtocolAdapter):
                 )
 
             # Step 3: Poll for attestation from Circle Iris API
-            self._logger.info(f"CCTP V2: Polling for attestation (Fast Transfer: {use_fast_transfer})")
+            self._logger.info(
+                f"CCTP V2: Polling for attestation (Fast Transfer: {use_fast_transfer})"
+            )
             attestation_url = get_iris_v2_attestation_url(
                 source_network, source_domain, burn_tx_hash
             )
@@ -559,12 +583,16 @@ class GatewayAdapter(ProtocolAdapter):
                                 if status == "complete":
                                     attestation_signature = message_data.get("attestation")
                                     attestation_message = message_data.get("message")
-                                    self._logger.info(f"CCTP V2: Attestation received after {attempt * 5}s")
+                                    self._logger.info(
+                                        f"CCTP V2: Attestation received after {attempt * 5}s"
+                                    )
                                     break
                             else:
                                 self._logger.debug(f"No messages yet (attempt {attempt + 1})")
                         elif response.status_code == 404:
-                            self._logger.debug(f"Transaction not yet indexed (attempt {attempt + 1})")
+                            self._logger.debug(
+                                f"Transaction not yet indexed (attempt {attempt + 1})"
+                            )
                         else:
                             self._logger.debug(f"HTTP {response.status_code}")
 
@@ -611,19 +639,29 @@ class GatewayAdapter(ProtocolAdapter):
             )
 
             mint_result = None
-            status = PaymentStatus.PENDING_SETTLEMENT if strict_settlement else PaymentStatus.PROCESSING
+            status = (
+                PaymentStatus.PENDING_SETTLEMENT if strict_settlement else PaymentStatus.PROCESSING
+            )
 
             if should_mint:
-                self._logger.info(f"CCTP V2: Attempting Agent-Side Mint (relayed={is_relayed}, dest={dest_network.value})")
-                mint_result = await self._mint_usdc(attestation_message, attestation_signature, dest_network)
+                self._logger.info(
+                    f"CCTP V2: Attempting Agent-Side Mint (relayed={is_relayed}, dest={dest_network.value})"
+                )
+                mint_result = await self._mint_usdc(
+                    attestation_message, attestation_signature, dest_network
+                )
 
                 if mint_result["success"]:
-                    note = f"Transfer completed via Agent-Side Mint. Tx: {mint_result.get('tx_hash')}"
-                    blockchain_final_tx = mint_result.get('tx_hash')
+                    note = (
+                        f"Transfer completed via Agent-Side Mint. Tx: {mint_result.get('tx_hash')}"
+                    )
+                    blockchain_final_tx = mint_result.get("tx_hash")
                     status = (
                         PaymentStatus.PENDING_SETTLEMENT
                         if mint_result.get("status") == "pending_confirmation"
-                        else (PaymentStatus.SETTLED if strict_settlement else PaymentStatus.COMPLETED)
+                        else (
+                            PaymentStatus.SETTLED if strict_settlement else PaymentStatus.COMPLETED
+                        )
                     )
                 else:
                     note = f"Agent-Side Mint failed: {mint_result.get('error')}. Check destination wallet gas."
@@ -657,7 +695,11 @@ class GatewayAdapter(ProtocolAdapter):
             else:
                 note = "Transfer handed off to CCTP Relayer/Forwarding Service for final minting"
                 blockchain_final_tx = None
-                status = PaymentStatus.PENDING_SETTLEMENT if strict_settlement else PaymentStatus.PROCESSING
+                status = (
+                    PaymentStatus.PENDING_SETTLEMENT
+                    if strict_settlement
+                    else PaymentStatus.PROCESSING
+                )
                 self._logger.info(f"CCTP V2: Attestation secured. {note} (max_fee={max_fee})")
 
             return PaymentResult(
@@ -667,14 +709,16 @@ class GatewayAdapter(ProtocolAdapter):
                     else status != PaymentStatus.FAILED
                 ),
                 transaction_id=burn_tx.id,
-                blockchain_tx=burn_tx.tx_hash, # Primary tx is the burn
+                blockchain_tx=burn_tx.tx_hash,  # Primary tx is the burn
                 amount=amount,
                 recipient=f"{dest_network.value}:{destination_address}",
                 method=self.method,
                 status=status,
                 metadata={
                     "cctp_version": "v2",
-                    "cctp_flow": "burn_attestation_mint" if should_mint else "burn_attestation_relay",
+                    "cctp_flow": "burn_attestation_mint"
+                    if should_mint
+                    else "burn_attestation_relay",
                     "transfer_mode": transfer_mode,
                     "source_domain": source_domain,
                     "destination_domain": dest_domain,
@@ -691,8 +735,11 @@ class GatewayAdapter(ProtocolAdapter):
                     "max_fee_usdc": str(Decimal(max_fee) / Decimal("1000000")),
                     "min_finality_threshold": finality_threshold,
                     "note": note,
-                    "settlement_final": bool(should_mint and mint_result and mint_result.get("success")),
-                    "manual_mint_required": not is_relayed and (not mint_result or not mint_result.get("success")),
+                    "settlement_final": bool(
+                        should_mint and mint_result and mint_result.get("success")
+                    ),
+                    "manual_mint_required": not is_relayed
+                    and (not mint_result or not mint_result.get("success")),
                     "idempotency_key": idempotency_key,
                 },
             )
@@ -734,8 +781,12 @@ class GatewayAdapter(ProtocolAdapter):
             return result
 
         # Handle string or Network enum
-        source_net_str = source_network.value if isinstance(source_network, Network) else str(source_network)
-        dest_net_str = dest_network.value if isinstance(dest_network, Network) else str(dest_network)
+        source_net_str = (
+            source_network.value if isinstance(source_network, Network) else str(source_network)
+        )
+        dest_net_str = (
+            dest_network.value if isinstance(dest_network, Network) else str(dest_network)
+        )
 
         result["source_network"] = source_net_str
         result["destination_network"] = dest_net_str
@@ -846,7 +897,10 @@ class GatewayAdapter(ProtocolAdapter):
 
         message_transmitter = get_message_transmitter_v2(dest_network)
         if not message_transmitter:
-            return {"success": False, "error": f"No MessageTransmitter configured for {dest_network.value}"}
+            return {
+                "success": False,
+                "error": f"No MessageTransmitter configured for {dest_network.value}",
+            }
 
         # Find a wallet on the destination chain to execute the transaction
         # Any wallet with gas can do this
@@ -854,10 +908,12 @@ class GatewayAdapter(ProtocolAdapter):
         if not executor_wallet:
             return {
                 "success": False,
-                "error": f"No wallet found on {dest_network.value} to execute minting. Please create a wallet on this network with native gas tokens."
+                "error": f"No wallet found on {dest_network.value} to execute minting. Please create a wallet on this network with native gas tokens.",
             }
 
-        self._logger.info(f"CCTP V2: Minting via wallet {executor_wallet.id} on {dest_network.value}")
+        self._logger.info(
+            f"CCTP V2: Minting via wallet {executor_wallet.id} on {dest_network.value}"
+        )
 
         try:
             # receiveMessage(message, attestation)
@@ -889,7 +945,7 @@ class GatewayAdapter(ProtocolAdapter):
                             "success": False,
                             "error": "Mint transaction FAILED on blockchain",
                             "tx_id": mint_tx.id,
-                            "tx_hash": updated_tx.tx_hash
+                            "tx_hash": updated_tx.tx_hash,
                         }
 
                     self._logger.info(f"CCTP V2: Mint confirmed: {updated_tx.tx_hash}")
@@ -897,7 +953,7 @@ class GatewayAdapter(ProtocolAdapter):
                         "success": True,
                         "tx_id": mint_tx.id,
                         "tx_hash": updated_tx.tx_hash,
-                        "executor_wallet": executor_wallet.id
+                        "executor_wallet": executor_wallet.id,
                     }
 
             if mint_tx_hash:
@@ -906,13 +962,13 @@ class GatewayAdapter(ProtocolAdapter):
                     "tx_id": mint_tx.id,
                     "tx_hash": mint_tx_hash,
                     "executor_wallet": executor_wallet.id,
-                    "status": "pending_confirmation"
+                    "status": "pending_confirmation",
                 }
 
             return {
                 "success": False,
                 "error": "Mint transaction timed out (no hash generated)",
-                "tx_id": mint_tx.id
+                "tx_id": mint_tx.id,
             }
 
         except Exception as e:

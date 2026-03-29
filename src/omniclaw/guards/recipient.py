@@ -109,14 +109,18 @@ class RecipientGuard(Guard):
         if self._mode == "whitelist":
             # Whitelist: must match to be allowed
             if matches:
-                event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, {"result": "PASS"})
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", context.wallet_id, {"result": "PASS"}
+                )
                 return GuardResult(
                     allowed=True,
                     guard_name=self.name,
                     metadata={"mode": "whitelist", "matched": True},
                 )
             else:
-                event_emitter.emit_background("guard.recipient_blocked", context.wallet_id, {"blocked": recipient})
+                event_emitter.emit_background(
+                    "guard.recipient_blocked", context.wallet_id, {"blocked": recipient}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=f"Recipient {recipient} not in whitelist",
@@ -126,7 +130,9 @@ class RecipientGuard(Guard):
         else:
             # Blacklist: must NOT match to be allowed
             if matches:
-                event_emitter.emit_background("guard.recipient_blocked", context.wallet_id, {"blocked": recipient})
+                event_emitter.emit_background(
+                    "guard.recipient_blocked", context.wallet_id, {"blocked": recipient}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=f"Recipient {recipient} is blacklisted",
@@ -134,7 +140,9 @@ class RecipientGuard(Guard):
                     metadata={"mode": "blacklist", "matched": True},
                 )
             else:
-                event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, {"result": "PASS"})
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", context.wallet_id, {"result": "PASS"}
+                )
                 return GuardResult(
                     allowed=True,
                     guard_name=self.name,

@@ -92,7 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Quickly set up your Control Plane credentials (.env.agent)",
     )
     setup_parser.add_argument("--api-key", help="Circle API Key")
-    setup_parser.add_argument("--network", default="ARC-TESTNET", help="Circle Network (default: ARC-TESTNET)")
+    setup_parser.add_argument(
+        "--network", default="ARC-TESTNET", help="Circle Network (default: ARC-TESTNET)"
+    )
 
     server_parser = subparsers.add_parser(
         "server",
@@ -122,9 +124,12 @@ def handle_setup(args: argparse.Namespace) -> int:
         print("â Found existing Entity Secret in managed store.")
     else:
         print("ð¡ No Entity Secret found for this API key.")
-        entity_secret = input("Enter your 64-char Entity Secret (or press Enter to generate): ").strip()
+        entity_secret = input(
+            "Enter your 64-char Entity Secret (or press Enter to generate): "
+        ).strip()
         if not entity_secret:
             from omniclaw.onboarding import auto_setup_entity_secret
+
             print("ð Generating and registering new Entity Secret...")
             entity_secret = auto_setup_entity_secret(api_key)
 

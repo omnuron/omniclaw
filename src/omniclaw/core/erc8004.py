@@ -92,7 +92,6 @@ IDENTITY_REGISTRY_ABI = [
         ],
         "outputs": [{"name": "", "type": "uint256"}],
     },
-
     # ─── ERC-8004 Identity extensions ───
     # read: getAgentWallet(uint256) → address
     {
@@ -419,6 +418,7 @@ VALIDATION_REGISTRY_ABI = [
 # ───────────────────────────────────────────────────────────────────
 # Helper Functions
 # ───────────────────────────────────────────────────────────────────
+
 
 def get_identity_registry(network: Network | str) -> str | None:
     """Get Identity Registry address for a network."""

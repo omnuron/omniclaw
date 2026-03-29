@@ -20,10 +20,10 @@ from omniclaw.storage.base import StorageBackend
 logger = get_logger("trust.cache")
 
 # TTLs in seconds (from spec §7.1)
-IDENTITY_TTL = 300    # 5 minutes
+IDENTITY_TTL = 300  # 5 minutes
 REPUTATION_TTL = 120  # 2 minutes
-METADATA_TTL = 600    # 10 minutes
-POLICY_TTL = 3600     # 60 minutes
+METADATA_TTL = 600  # 10 minutes
+POLICY_TTL = 3600  # 60 minutes
 
 COLLECTION = "trust_cache"
 
@@ -91,11 +91,15 @@ class TrustCache:
             ttl = self._default_ttl(data_type)
 
         key = self._key(chain_id, address, data_type)
-        await self._storage.save(COLLECTION, key, {
-            "data": data,
-            "_expires_at": time.time() + ttl,
-            "_data_type": data_type,
-        })
+        await self._storage.save(
+            COLLECTION,
+            key,
+            {
+                "data": data,
+                "_expires_at": time.time() + ttl,
+                "_data_type": data_type,
+            },
+        )
 
     async def invalidate(
         self,

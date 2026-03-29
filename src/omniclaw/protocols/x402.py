@@ -83,9 +83,9 @@ class PaymentRequirements:
         """Parse requirements from 402 response (V2 Header, V2 Body, or V1 Header)."""
         # Try V2 Header (PAYMENT-REQUIRED, base64-encoded JSON)
         # HTTP headers are case-insensitive per RFC 7230
-        payment_required_v2 = response.headers.get(
-            "payment-required"
-        ) or response.headers.get("PAYMENT-REQUIRED")
+        payment_required_v2 = response.headers.get("payment-required") or response.headers.get(
+            "PAYMENT-REQUIRED"
+        )
         if payment_required_v2:
             try:
                 decoded = base64.b64decode(payment_required_v2)
@@ -430,7 +430,9 @@ class X402Adapter(ProtocolAdapter):
                     source_network=agent_network,
                 )
 
-                if not (gateway_result.success or is_effective_success_status(gateway_result.status)):
+                if not (
+                    gateway_result.success or is_effective_success_status(gateway_result.status)
+                ):
                     return PaymentResult(
                         success=False,
                         transaction_id=gateway_result.transaction_id,
@@ -477,12 +479,18 @@ class X402Adapter(ProtocolAdapter):
                 )
                 tx = transfer_result.transaction
                 tx_state = (
-                    tx.state.value if (tx and hasattr(tx.state, "value")) else (str(tx.state) if tx else "")
+                    tx.state.value
+                    if (tx and hasattr(tx.state, "value"))
+                    else (str(tx.state) if tx else "")
                 )
                 if tx and tx_state == "COMPLETE":
-                    transfer_status = PaymentStatus.SETTLED if strict_settlement else PaymentStatus.COMPLETED
+                    transfer_status = (
+                        PaymentStatus.SETTLED if strict_settlement else PaymentStatus.COMPLETED
+                    )
                 elif tx and tx_state in ("FAILED", "CANCELLED"):
-                    transfer_status = PaymentStatus.FAILED_FINAL if strict_settlement else PaymentStatus.FAILED
+                    transfer_status = (
+                        PaymentStatus.FAILED_FINAL if strict_settlement else PaymentStatus.FAILED
+                    )
                 else:
                     transfer_status = (
                         PaymentStatus.PENDING_SETTLEMENT

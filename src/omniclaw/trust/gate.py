@@ -131,13 +131,17 @@ class TrustGate:
         try:
             # Step 1+2+3: Resolve identity (with caching)
             identity, cache_hit = await self._resolve_with_cache(
-                recipient_address, chain_id, network,
+                recipient_address,
+                chain_id,
+                network,
             )
 
             # Step 4: Aggregate reputation (if identity found)
             if identity:
                 reputation = await self._aggregate_reputation(
-                    identity, chain_id, network,
+                    identity,
+                    chain_id,
+                    network,
                 )
 
         except Exception as e:
@@ -273,16 +277,18 @@ class TrustGate:
         signals: list[FeedbackSignal] = []
         if cached_rep and "signals" in cached_rep:
             for s in cached_rep["signals"]:
-                signals.append(FeedbackSignal(
-                    agent_id=s["agent_id"],
-                    client_address=s["client_address"],
-                    feedback_index=s["feedback_index"],
-                    value=s["value"],
-                    value_decimals=s["value_decimals"],
-                    tag1=s.get("tag1", ""),
-                    tag2=s.get("tag2", ""),
-                    is_revoked=s.get("is_revoked", False),
-                ))
+                signals.append(
+                    FeedbackSignal(
+                        agent_id=s["agent_id"],
+                        client_address=s["client_address"],
+                        feedback_index=s["feedback_index"],
+                        value=s["value"],
+                        value_decimals=s["value_decimals"],
+                        tag1=s.get("tag1", ""),
+                        tag2=s.get("tag2", ""),
+                        is_revoked=s.get("is_revoked", False),
+                    )
+                )
 
         return self._scoring.compute_wts(
             signals=signals,
@@ -303,7 +309,8 @@ class TrustGate:
         try:
             # Use the provider to fetch real on-chain feedback
             raw_signals = await self._provider.get_all_feedback(
-                identity.agent_id, network_key,
+                identity.agent_id,
+                network_key,
             )
             return {
                 "signals": [

@@ -13,4 +13,3 @@ __all__ = [
     "ReputationAggregator",
     "ERC8004Provider",
 ]
-

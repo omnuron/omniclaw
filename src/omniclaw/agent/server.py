@@ -33,8 +33,12 @@ def create_app() -> FastAPI:
         await policy_mgr.load()
 
         # Initialize OmniClaw client
-        circle_api_key = app.state.config.get("circle_api_key") if hasattr(app.state, "config") else None
-        entity_secret = app.state.config.get("entity_secret") if hasattr(app.state, "config") else None
+        circle_api_key = (
+            app.state.config.get("circle_api_key") if hasattr(app.state, "config") else None
+        )
+        entity_secret = (
+            app.state.config.get("entity_secret") if hasattr(app.state, "config") else None
+        )
 
         from omniclaw import OmniClaw
         from omniclaw.core.types import Network
@@ -85,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
 
     import os
+
     app.state.config = {
         "policy_path": os.environ.get("OMNICLAW_AGENT_POLICY_PATH", "/config/policy.json"),
         "circle_api_key": os.environ.get("CIRCLE_API_KEY"),
@@ -98,4 +103,5 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8080)
