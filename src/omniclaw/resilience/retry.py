@@ -23,6 +23,7 @@ except ImportError:
     def retry(*args, **kwargs):
         def decorator(f):
             return f
+
         return decorator
 
     AsyncRetrying = None
@@ -63,11 +64,7 @@ retry_policy = retry(
 )
 
 
-async def execute_with_retry(
-    func: Callable[..., Any],
-    *args,
-    **kwargs
-) -> Any:
+async def execute_with_retry(func: Callable[..., Any], *args, **kwargs) -> Any:
     """Execute an async function with standard retry policy."""
     async for attempt in AsyncRetrying(
         retry=retry_if_exception(is_transient_error),

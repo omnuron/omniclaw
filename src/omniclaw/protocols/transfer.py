@@ -34,9 +34,6 @@ EVM_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
 SOLANA_ADDRESS_PATTERN = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
 
-
-
-
 class TransferAdapter(ProtocolAdapter):
     """Adapter for direct USDC transfers between wallets (EVM & Solana)."""
 
@@ -53,7 +50,13 @@ class TransferAdapter(ProtocolAdapter):
     def method(self) -> PaymentMethod:
         return PaymentMethod.TRANSFER
 
-    def supports(self, recipient: str, source_network: Network | str | None = None, destination_chain: Network | str | None = None, **kwargs: Any) -> bool:
+    def supports(
+        self,
+        recipient: str,
+        source_network: Network | str | None = None,
+        destination_chain: Network | str | None = None,
+        **kwargs: Any,
+    ) -> bool:
         """Check if recipient is a valid blockchain address for current network."""
         # Determine network context (Source Wallet wins over Global Config)
         network = source_network or self._config.network
@@ -162,7 +165,9 @@ class TransferAdapter(ProtocolAdapter):
                 status = PaymentStatus.FAILED_FINAL if strict_settlement else PaymentStatus.FAILED
 
         return PaymentResult(
-            success=is_irreversible_success_status(status) if strict_settlement else status != PaymentStatus.FAILED,
+            success=is_irreversible_success_status(status)
+            if strict_settlement
+            else status != PaymentStatus.FAILED,
             transaction_id=tx.id if tx else None,
             blockchain_tx=transfer_result.tx_hash,
             amount=amount,

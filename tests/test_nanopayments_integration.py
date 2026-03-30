@@ -3980,7 +3980,6 @@ class TestFastAPIIntegrationSellerDecorator:
         FastAPI route with gateway.handle() returns 402 when no PAYMENT-SIGNATURE header.
         Tests the FastAPI integration pattern by directly simulating ASGI calls.
         """
-        from starlette.requests import Request
         from omniclaw.protocols.nanopayments.middleware import (
             GatewayMiddleware,
             PaymentRequiredHTTPError,

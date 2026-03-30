@@ -206,6 +206,7 @@ class GatewayAPIClient:
         """Get or create HTTP client."""
         if self._http_client is None:
             import httpx
+
             self._http_client = httpx.AsyncClient(timeout=self._timeout)
         return self._http_client
 

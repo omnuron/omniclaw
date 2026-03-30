@@ -9,10 +9,9 @@ warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 import base64
 import json
 import os
-import sys
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import typer
@@ -86,7 +85,7 @@ def configure(
 def address() -> dict[str, Any]:
     """Get wallet address."""
     client = get_client()
-    config = load_config()
+    _config = load_config()
 
     try:
         response = client.get("/api/v1/address")
@@ -115,7 +114,7 @@ def balance() -> dict[str, Any]:
         return data
     except httpx.HTTPStatusError as e:
         try:
-            detail = e.response.json().get('detail', str(e))
+            detail = e.response.json().get("detail", str(e))
         except Exception:
             detail = e.response.text or str(e)
         typer.echo(f"Error: {detail}", err=True)
@@ -128,11 +127,17 @@ def balance() -> dict[str, Any]:
 @app.command()
 def pay(
     recipient: str = typer.Option(..., "--recipient", help="Payment recipient (address or URL)"),
-    amount: str | None = typer.Option(None, "--amount", help="Amount in USDC (optional for x402 URLs)"),
+    amount: str | None = typer.Option(
+        None, "--amount", help="Amount in USDC (optional for x402 URLs)"
+    ),
     purpose: str | None = typer.Option(None, "--purpose", help="Payment purpose"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
     method: str = typer.Option("GET", "--method", help="HTTP method for x402 requests"),
@@ -157,7 +162,7 @@ def pay(
 
     # If recipient is a URL, handle x402 flow
     if recipient.startswith("http"):
-        typer.echo(f"🚀 Paying for x402 service: {recipient}")
+        typer.echo(f"Ã°ÂÂÂ Paying for x402 service: {recipient}")
         payload: dict[str, Any] = {
             "url": recipient,
             "method": method,
@@ -175,7 +180,7 @@ def pay(
             data = response.json()
             if output:
                 Path(output).write_text(json.dumps(data, indent=2))
-                typer.echo(f"✅ Response saved to {output}")
+                typer.echo(f"Ã¢ÂÂ Response saved to {output}")
             else:
                 typer.echo(json.dumps(data, indent=2))
             return data
@@ -227,8 +232,12 @@ def simulate(
     recipient: str = typer.Option(..., "--recipient", help="Recipient to simulate"),
     amount: str = typer.Option(..., "--amount", help="Amount to simulate"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
 ) -> dict[str, Any]:
@@ -300,8 +309,12 @@ def create_intent(
     purpose: str | None = typer.Option(None, "--purpose", help="Purpose"),
     expires_in: int | None = typer.Option(None, "--expires-in", help="Expiry in seconds"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
-    destination_chain: str | None = typer.Option(None, "--destination-chain", help="Target network"),
-    fee_level: str | None = typer.Option(None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Target network"
+    ),
+    fee_level: str | None = typer.Option(
+        None, "--fee-level", help="Gas fee level (LOW, MEDIUM, HIGH)"
+    ),
     check_trust: bool = typer.Option(False, "--check-trust", help="Run Trust Gate check"),
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
 ) -> dict[str, Any]:
@@ -386,7 +399,7 @@ def get_intent(
 @app.command()
 def cancel_intent(
     intent_id: str = typer.Option(..., "--intent-id", help="Intent ID to cancel"),
-    reason: Optional[str] = typer.Option(None, "--reason", help="Cancel reason"),
+    reason: str | None = typer.Option(None, "--reason", help="Cancel reason"),
 ) -> dict[str, Any]:
     """Cancel a payment intent."""
     client = get_client()
@@ -437,7 +450,7 @@ def serve(
 ) -> None:
     """Expose a local service behind an x402 payment gate."""
     import uvicorn
-    from fastapi import FastAPI, Response, Request
+    from fastapi import FastAPI, Request, Response
     from fastapi.responses import JSONResponse
 
     server_app = FastAPI()
@@ -449,23 +462,25 @@ def serve(
         sig = request.headers.get("PAYMENT-SIGNATURE")
         if not sig:
             # Return 402 with requirements
-            config = load_config()
+            _config = load_config()
             wallet_addr = client.get("/api/v1/address").json().get("address")
-            
+
             requirements = {
                 "x402Version": 2,
-                "accepts": [{
-                    "scheme": "exact",
-                    "network": "eip155:5042002", # ARC Testnet
-                    "amount": str(int(price * 10**6)),
-                    "payTo": wallet_addr,
-                }]
+                "accepts": [
+                    {
+                        "scheme": "exact",
+                        "network": "eip155:5042002",  # ARC Testnet
+                        "amount": str(int(price * 10**6)),
+                        "payTo": wallet_addr,
+                    }
+                ],
             }
             encoded = base64.b64encode(json.dumps(requirements).encode()).decode()
             return JSONResponse(
                 status_code=402,
                 content={"detail": "Payment Required"},
-                headers={"PAYMENT-REQUIRED": encoded}
+                headers={"PAYMENT-REQUIRED": encoded},
             )
 
         # 2. Verify payment with OmniClaw Server
@@ -475,12 +490,12 @@ def serve(
             verify_payload = {
                 "signature": sig,
                 "amount": str(price),
-                "sender": "unknown", # extracted from sig later
-                "resource": str(request.url)
+                "sender": "unknown",  # extracted from sig later
+                "resource": str(request.url),
             }
             v_resp = client.post("/api/v1/x402/verify", json=verify_payload)
             v_resp.raise_for_status()
-            
+
             if not v_resp.json().get("valid"):
                 return JSONResponse(status_code=402, content={"detail": "Invalid Payment"})
 
@@ -492,22 +507,16 @@ def serve(
             env = os.environ.copy()
             env["OMNICLAW_PAYER_ADDRESS"] = v_resp.json().get("sender", "unknown")
             env["OMNICLAW_AMOUNT_USD"] = str(price)
-            
-            result = subprocess.run(
-                exec_cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                env=env
-            )
+
+            result = subprocess.run(exec_cmd, shell=True, capture_output=True, text=True, env=env)
             return Response(content=result.stdout, media_type="text/plain")
         except Exception as e:
             return JSONResponse(status_code=500, content={"detail": f"Execution failed: {e}"})
 
-    typer.echo(f"🌐 OmniClaw Service exposed at http://localhost:{port}{endpoint}")
-    typer.echo(f"💰 Price: ${price} USDC")
-    typer.echo(f"🛠️ Exec: {exec_cmd}")
-    
+    typer.echo(f"Ã°ÂÂÂ OmniClaw Service exposed at http://localhost:{port}{endpoint}")
+    typer.echo(f"Ã°ÂÂÂ° Price: ${price} USDC")
+    typer.echo(f"Ã°ÂÂÂ Ã¯Â¸Â Exec: {exec_cmd}")
+
     uvicorn.run(server_app, host="0.0.0.0", port=port)
 
 
@@ -537,8 +546,8 @@ def status() -> dict[str, Any]:
         typer.echo(f"Wallet:    {status_data['Wallet']}")
         typer.echo(f"Balance:   {status_data['Balance']}")
         typer.echo(f"Guards:    {status_data['Guards']}")
-        typer.echo(f"Circle:    {status_data['Circle']} ✓")
-        typer.echo(f"Circuit:   {status_data['Circuit']} ✓")
+        typer.echo(f"Circle:    {status_data['Circle']} Ã¢ÂÂ")
+        typer.echo(f"Circuit:   {status_data['Circuit']} Ã¢ÂÂ")
 
         return status_data
     except Exception as e:

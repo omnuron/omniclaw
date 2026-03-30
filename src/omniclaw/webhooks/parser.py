@@ -247,7 +247,7 @@ class WebhookParser:
             if "createDate" not in data:
                 raise ValidationError("Missing 'createDate' in payload for replay protection")
             try:
-                timestamp_raw = datetime.fromisoformat(data["createDate"].replace('Z', '+00:00'))
+                timestamp_raw = datetime.fromisoformat(data["createDate"].replace("Z", "+00:00"))
                 timestamp = (
                     timestamp_raw.replace(tzinfo=None) if timestamp_raw.tzinfo else timestamp_raw
                 )

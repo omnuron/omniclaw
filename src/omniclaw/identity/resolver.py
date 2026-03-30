@@ -101,7 +101,9 @@ class IdentityResolver:
             if self._provider:
                 owner_address = await self._provider.get_agent_owner(agent_id, network_key)
                 if not owner_address:
-                    logger.debug(f"Agent {agent_id} not found in Identity Registry on {network_key}")
+                    logger.debug(
+                        f"Agent {agent_id} not found in Identity Registry on {network_key}"
+                    )
                     return None
 
                 agent_uri = await self._provider.get_agent_uri(agent_id, network_key)
@@ -110,18 +112,24 @@ class IdentityResolver:
             # ── Fallback: Circle SDK (legacy, for backwards compatibility) ──
             elif self._wallet_service:
                 owner_address = await self._read_contract_legacy(
-                    network, get_identity_registry(network_key),
-                    "ownerOf(uint256)", [str(agent_id)],
+                    network,
+                    get_identity_registry(network_key),
+                    "ownerOf(uint256)",
+                    [str(agent_id)],
                 )
                 if not owner_address:
                     return None
                 agent_uri = await self._read_contract_legacy(
-                    network, get_identity_registry(network_key),
-                    "tokenURI(uint256)", [str(agent_id)],
+                    network,
+                    get_identity_registry(network_key),
+                    "tokenURI(uint256)",
+                    [str(agent_id)],
                 )
                 agent_wallet = await self._read_contract_legacy(
-                    network, get_identity_registry(network_key),
-                    "getAgentWallet(uint256)", [str(agent_id)],
+                    network,
+                    get_identity_registry(network_key),
+                    "getAgentWallet(uint256)",
+                    [str(agent_id)],
                 )
             else:
                 logger.debug("No provider or wallet service — skipping on-chain lookups")
@@ -140,7 +148,11 @@ class IdentityResolver:
                 if registration_data:
                     # Validate registration file type (EIP-8004 §3)
                     reg_type = registration_data.get("type", "")
-                    if reg_type and "eip-8004" not in reg_type.lower() and "registration" not in reg_type.lower():
+                    if (
+                        reg_type
+                        and "eip-8004" not in reg_type.lower()
+                        and "registration" not in reg_type.lower()
+                    ):
                         logger.warning(
                             f"Agent {agent_id} registration file has unexpected type: {reg_type}"
                         )
@@ -177,7 +189,9 @@ class IdentityResolver:
             if self._provider:
                 balance = await self._provider.get_balance_of(wallet_address, network_key)
                 if balance > 0:
-                    token_id = await self._provider.get_token_of_owner(wallet_address, 0, network_key)
+                    token_id = await self._provider.get_token_of_owner(
+                        wallet_address, 0, network_key
+                    )
                     if token_id is not None:
                         return await self.resolve_by_id(token_id, network)
 
@@ -185,11 +199,15 @@ class IdentityResolver:
                 # Legacy fallback
                 registry_address = get_identity_registry(network_key)
                 balance = await self._read_contract_legacy(
-                    network, registry_address, "balanceOf(address)", [wallet_address],
+                    network,
+                    registry_address,
+                    "balanceOf(address)",
+                    [wallet_address],
                 )
                 if balance and int(balance) > 0:
                     token_id = await self._read_contract_legacy(
-                        network, registry_address,
+                        network,
+                        registry_address,
                         "tokenOfOwnerByIndex(address,uint256)",
                         [wallet_address, "0"],
                     )
@@ -325,6 +343,7 @@ class IdentityResolver:
         try:
             # Extract domain from endpoint URL
             from urllib.parse import urlparse
+
             parsed = urlparse(endpoint_url)
             domain = parsed.netloc
             if not domain:
@@ -349,9 +368,7 @@ class IdentityResolver:
                         reg.get("agentId") == agent_id
                         and reg.get("agentRegistry") == agent_registry
                     ):
-                        logger.info(
-                            f"Endpoint domain verified: {domain} for agent {agent_id}"
-                        )
+                        logger.info(f"Endpoint domain verified: {domain} for agent {agent_id}")
                         return True
 
                 logger.debug(
@@ -394,10 +411,10 @@ class IdentityResolver:
                 )
                 if is_verified:
                     from urllib.parse import urlparse
+
                     verified.append(urlparse(endpoint).netloc)
 
         return verified
 
 
 __all__ = ["IdentityResolver"]
-

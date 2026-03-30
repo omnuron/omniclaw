@@ -86,7 +86,9 @@ class GuardConfig:
             "max_per_hour": self.max_per_hour,
             "max_per_day": self.max_per_day,
             # Confirm
-            "confirm_threshold": str(self.confirm_threshold) if self.confirm_threshold is not None else None,
+            "confirm_threshold": str(self.confirm_threshold)
+            if self.confirm_threshold is not None
+            else None,
             "always_confirm": self.always_confirm,
         }
 

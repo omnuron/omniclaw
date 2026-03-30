@@ -24,6 +24,7 @@ _ERC8004_REGISTRATION_TYPE = "https://eips.ethereum.org/EIPS/eip-8004#registrati
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class TrustVerdict(str, Enum):
     """Outcome of a Trust Gate evaluation."""
 
@@ -47,12 +48,13 @@ class TrustErrorCode(str, Enum):
 # Agent Identity (from ERC-8004 Identity Registry)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentService:
     """A service endpoint advertised in the agent registration file."""
 
-    name: str                # e.g. "A2A", "MCP", "web", "ENS", "email"
-    endpoint: str            # URL / ENS name / email
+    name: str  # e.g. "A2A", "MCP", "web", "ENS", "email"
+    endpoint: str  # URL / ENS name / email
     version: str | None = None
 
 
@@ -66,17 +68,19 @@ class AgentIdentity:
     """
 
     # On-chain fields
-    agent_id: int                          # ERC-721 tokenId
-    wallet_address: str                    # Owner address of the NFT
-    agent_wallet: str | None = None        # Payment address (agentWallet metadata)
-    agent_registry: str | None = None      # e.g. "eip155:1:0x8004A1..."
+    agent_id: int  # ERC-721 tokenId
+    wallet_address: str  # Owner address of the NFT
+    agent_wallet: str | None = None  # Payment address (agentWallet metadata)
+    agent_registry: str | None = None  # e.g. "eip155:1:0x8004A1..."
 
     # Off-chain registration file fields (from agentURI → JSON)
-    registration_type: str | None = None   # MUST: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    registration_type: str | None = (
+        None  # MUST: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    )
     name: str | None = None
     description: str | None = None
     image: str | None = None
-    organization: str | None = None        # Derived from name/description heuristic
+    organization: str | None = None  # Derived from name/description heuristic
     services: list[AgentService] = field(default_factory=list)
     x402_support: bool = False
     active: bool = True
@@ -112,15 +116,13 @@ class AgentIdentity:
         reg_type = data.get("type")
         if not reg_type:
             logger.warning(
-                "Agent %d registration file missing 'type' field "
-                "(expected '%s')",
+                "Agent %d registration file missing 'type' field (expected '%s')",
                 agent_id,
                 _ERC8004_REGISTRATION_TYPE,
             )
         elif reg_type != _ERC8004_REGISTRATION_TYPE:
             logger.warning(
-                "Agent %d registration file has unexpected type '%s' "
-                "(expected '%s')",
+                "Agent %d registration file has unexpected type '%s' (expected '%s')",
                 agent_id,
                 reg_type,
                 _ERC8004_REGISTRATION_TYPE,
@@ -167,6 +169,7 @@ class AgentIdentity:
 # Reputation (from ERC-8004 Reputation Registry)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FeedbackSignal:
     """Single feedback entry from the Reputation Registry."""
@@ -174,8 +177,8 @@ class FeedbackSignal:
     agent_id: int
     client_address: str
     feedback_index: int
-    value: int              # Raw int128 value
-    value_decimals: int     # uint8, 0-18
+    value: int  # Raw int128 value
+    value_decimals: int  # uint8, 0-18
     tag1: str = ""
     tag2: str = ""
     is_revoked: bool = False
@@ -185,7 +188,7 @@ class FeedbackSignal:
         """Normalize value using value_decimals to a float."""
         if self.value_decimals == 0:
             return float(self.value)
-        return float(self.value) / (10 ** self.value_decimals)
+        return float(self.value) / (10**self.value_decimals)
 
 
 @dataclass
@@ -196,9 +199,9 @@ class ReputationScore:
     Algorithm from §3.3 of the system design spec.
     """
 
-    wts: int                        # 0-100 weighted trust score
-    sample_size: int                # Number of feedback signals used
-    new_agent: bool                 # True if < 3 feedback entries
+    wts: int  # 0-100 weighted trust score
+    sample_size: int  # Number of feedback signals used
+    new_agent: bool  # True if < 3 feedback entries
     flags: list[str] = field(default_factory=list)
     raw_signals: list[FeedbackSignal] = field(default_factory=list)
 
@@ -212,6 +215,7 @@ class ReputationScore:
 # ---------------------------------------------------------------------------
 # Trust Check Result (returned to SDK users)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TrustCheckResult:
@@ -268,6 +272,7 @@ class TrustCheckResult:
 # Trust Policy
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TrustPolicy:
     """
@@ -293,7 +298,7 @@ class TrustPolicy:
     identity_required: bool = False
 
     # Reputation thresholds
-    min_wts: int = 0                       # 0-100
+    min_wts: int = 0  # 0-100
     min_feedback_count: int = 0
 
     # Attestations

@@ -54,7 +54,9 @@ class SingleTxGuard(Guard):
         amount = context.amount
 
         if amount > self._max_amount:
-            event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, payload={"result": "FAIL"})
+            event_emitter.emit_background(
+                "payment.guard_evaluated", context.wallet_id, payload={"result": "FAIL"}
+            )
             return GuardResult(
                 allowed=False,
                 reason=(f"Transaction amount {amount} exceeds maximum {self._max_amount}"),
@@ -76,7 +78,9 @@ class SingleTxGuard(Guard):
                 },
             )
 
-        event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, payload={"result": "PASS"})
+        event_emitter.emit_background(
+            "payment.guard_evaluated", context.wallet_id, payload={"result": "PASS"}
+        )
         return GuardResult(
             allowed=True,
             guard_name=self.name,

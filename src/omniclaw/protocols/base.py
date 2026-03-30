@@ -35,7 +35,13 @@ class ProtocolAdapter(ABC):
         ...
 
     @abstractmethod
-    def supports(self, recipient: str, source_network: Network | str | None = None, destination_chain: Network | str | None = None, **kwargs: Any) -> bool:
+    def supports(
+        self,
+        recipient: str,
+        source_network: Network | str | None = None,
+        destination_chain: Network | str | None = None,
+        **kwargs: Any,
+    ) -> bool:
         """
         Check if this adapter can handle the given recipient.
 
