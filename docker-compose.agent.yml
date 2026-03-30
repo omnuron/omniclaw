@@ -1,4 +1,15 @@
 services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   omniclaw-agent:
     build:
       context: .
@@ -6,7 +17,7 @@ services:
     command: uv run omniclaw server --host 0.0.0.0 --port 8080
     env_file: .env
     environment:
-      - OMNICLAW_REDIS_URL=redis://host.docker.internal:6379/0
+      - OMNICLAW_REDIS_URL=redis://redis:6379/0
       - OMNICLAW_AGENT_POLICY_PATH=/config/policy.json
       - OMNICLAW_AGENT_TOKEN=payment-agent-token
       - OMNICLAW_LOG_LEVEL=INFO
@@ -14,5 +25,9 @@ services:
       - ./examples/agent/policy.json:/config/policy.json:ro
     ports:
       - "8080:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:

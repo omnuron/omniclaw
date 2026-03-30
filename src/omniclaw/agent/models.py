@@ -166,3 +166,22 @@ class HealthResponse(BaseModel):
 
     status: str
     version: str = "1.0.0"
+
+
+class X402PayRequest(BaseModel):
+    """X402 Payment request."""
+
+    url: str = Field(..., description="x402 Service URL")
+    method: str = Field("GET", description="HTTP method")
+    body: str | None = Field(None, description="Request body")
+    headers: dict[str, str] | None = Field(None, description="Request headers")
+    idempotency_key: str | None = Field(None, description="Idempotency key")
+
+
+class X402VerifyRequest(BaseModel):
+    """X402 Verification request."""
+
+    signature: str = Field(..., description="Payment signature/proof")
+    amount: str = Field(..., description="Amount paid")
+    sender: str = Field(..., description="Sender address")
+    resource: str = Field(..., description="Resource URL")

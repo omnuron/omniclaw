@@ -47,11 +47,23 @@ class RedisStorage(StorageBackend):
         if self._client is None:
             try:
                 import redis.asyncio as redis
+                from redis.backoff import ExponentialBackoff
+                from redis.retry import Retry
             except ImportError:
                 raise ImportError(
                     "redis package required for RedisStorage. Install with: pip install redis"
                 ) from None
-            self._client = redis.from_url(self._redis_url, decode_responses=True)
+            self._client = redis.from_url(
+                self._redis_url,
+                decode_responses=True,
+                socket_timeout=10.0,
+                socket_connect_timeout=10.0,
+                retry_on_timeout=True,
+                retry=Retry(
+                    backoff=ExponentialBackoff(base=1, cap=5),
+                    retries=3,
+                ),
+            )
         return self._client
 
     def _make_key(self, collection: str, key: str) -> str:

@@ -8,9 +8,8 @@ wallet and transaction operations.
 from __future__ import annotations
 
 import uuid
+import threading
 from typing import Any
-
-from circle.web3 import developer_controlled_wallets, utils
 
 from omniclaw.core.config import Config
 from omniclaw.core.exceptions import (
@@ -18,6 +17,7 @@ from omniclaw.core.exceptions import (
     NetworkError,
     WalletError,
 )
+from omniclaw.core.logging import get_logger
 from omniclaw.core.types import (
     AccountType,
     Balance,
@@ -34,8 +34,16 @@ class CircleClient:
 
     def __init__(self, config: Config) -> None:
         self._config = config
+        self._logger = get_logger("circle_client")
+        self._lock = threading.Lock()
 
         try:
+            # Import Circle SDK lazily to avoid circular import with lazy module loader
+            from circle.web3 import developer_controlled_wallets, utils
+
+            self._dcl = developer_controlled_wallets
+            self._utils = utils
+
             # Initialize the Circle SDK client
             self._client = utils.init_developer_controlled_wallets_client(
                 api_key=config.circle_api_key,
@@ -48,9 +56,19 @@ class CircleClient:
             ) from e
 
         # Initialize API instances
-        self._wallet_sets_api = developer_controlled_wallets.WalletSetsApi(self._client)
-        self._wallets_api = developer_controlled_wallets.WalletsApi(self._client)
-        self._transactions_api = developer_controlled_wallets.TransactionsApi(self._client)
+        self._wallet_sets_api = self._dcl.WalletSetsApi(self._client)
+        self._wallets_api = self._dcl.WalletsApi(self._client)
+        self._transactions_api = self._dcl.TransactionsApi(self._client)
+
+        # 10/10 RESILIENCE: The Circle Python SDK has a thread-safety race condition
+        # in its lazy loader. We force resolution in the main thread by calling
+        # a harmless method before any parallel threads are spawned.
+        try:
+            with self._lock:
+                # Harmless call to warm up the configurations
+                _ = self._wallet_sets_api.get_wallet_sets(page_size=1)
+        except Exception as e:
+            self._logger.debug(f"SDK Warmup (get_wallet_sets): {e}")
 
     # ==================== Wallet Set Operations ====================
 
@@ -66,14 +84,14 @@ class CircleClient:
 
             return wallet_sets
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to list wallet sets: {e}",
                 details={"api_error": str(e)},
             ) from e
 
     def _get_ciphertext(self) -> str:
-        return utils.generate_entity_secret_ciphertext(
+        return self._utils.generate_entity_secret_ciphertext(
             api_key=self._config.circle_api_key,
             entity_secret_hex=self._config.entity_secret,
         )
@@ -85,11 +103,19 @@ class CircleClient:
             ws_data = response.data.wallet_set.actual_instance.to_dict()
             return WalletSetInfo.from_api_response(ws_data)
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to get wallet set {wallet_set_id}: {e}",
                 details={"api_error": str(e), "wallet_set_id": wallet_set_id},
             ) from e
+
+    def find_wallet_set_by_name(self, name: str) -> WalletSetInfo | None:
+        """Find a wallet set by its human-readable name."""
+        wallet_sets = self.list_wallet_sets()
+        for ws in wallet_sets:
+            if ws.name == name:
+                return ws
+        return None
 
     # ==================== Wallet Operations ====================
 
@@ -99,23 +125,26 @@ class CircleClient:
     ) -> WalletSetInfo:
         """Create a new wallet set."""
         try:
-            ciphertext = self._get_ciphertext()
-            idempotency_key = str(uuid.uuid4())
+            with self._lock:
+                ciphertext = self._get_ciphertext()
 
-            request = developer_controlled_wallets.CreateWalletSetRequest.from_dict(
-                {
-                    "name": name,
-                    "idempotencyKey": idempotency_key,
-                    "entitySecretCiphertext": ciphertext,
-                }
-            )
-            response = self._wallet_sets_api.create_wallet_set(request)
+                # 10/10 IDEMPOTENCY: Derive UUID from name to ensure Circle reuses existing set
+                idempotency_key = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"omniclaw-set-{name}"))
 
-            # Extract wallet set data from response
-            wallet_set_data = response.data.wallet_set
-            return WalletSetInfo.from_api_response(wallet_set_data.to_dict())
+                request = self._dcl.CreateWalletSetRequest.from_dict(
+                    {
+                        "name": name,
+                        "idempotencyKey": idempotency_key,
+                        "entitySecretCiphertext": ciphertext,
+                    }
+                )
+                response = self._wallet_sets_api.create_wallet_set(request)
 
-        except developer_controlled_wallets.ApiException as e:
+                # Extract wallet set data from response
+                wallet_set_data = response.data.wallet_set
+                return WalletSetInfo.from_api_response(wallet_set_data.to_dict())
+
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to create wallet set: {e}",
                 details={"api_error": str(e), "name": name},
@@ -144,22 +173,29 @@ class CircleClient:
         blockchain_str = blockchain.value if isinstance(blockchain, Network) else blockchain
 
         try:
-            ciphertext = self._get_ciphertext()
-            idempotency_key = str(uuid.uuid4())
+            with self._lock:
+                ciphertext = self._get_ciphertext()
 
-            request = developer_controlled_wallets.CreateWalletRequest.from_dict(
-                {
-                    "walletSetId": wallet_set_id,
-                    "blockchains": [blockchain_str],
-                    "count": count,
-                    "accountType": account_type.value
-                    if hasattr(account_type, "value")
-                    else str(account_type),
-                    "idempotencyKey": idempotency_key,
-                    "entitySecretCiphertext": ciphertext,
-                }
-            )
-            response = self._wallets_api.create_wallet(request)
+                # 10/10 IDEMPOTENCY: Derive UUID from set + blockchain to ensure reuse
+                idempotency_key = str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_DNS, f"omniclaw-wallet-{wallet_set_id}-{blockchain_str}"
+                    )
+                )
+
+                request = self._dcl.CreateWalletRequest.from_dict(
+                    {
+                        "walletSetId": wallet_set_id,
+                        "blockchains": [blockchain_str],
+                        "count": count,
+                        "accountType": account_type.value
+                        if hasattr(account_type, "value")
+                        else str(account_type),
+                        "idempotencyKey": idempotency_key,
+                        "entitySecretCiphertext": ciphertext,
+                    }
+                )
+                response = self._wallets_api.create_wallet(request)
 
             wallets = []
             for wallet in response.data.wallets:
@@ -168,7 +204,7 @@ class CircleClient:
 
             return wallets
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to create wallets: {e}",
                 details={
@@ -186,7 +222,7 @@ class CircleClient:
             wallet_data = response.data.wallet.actual_instance.to_dict()
             return WalletInfo.from_api_response(wallet_data)
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to get wallet {wallet_id}: {e}",
                 wallet_id=wallet_id,
@@ -217,7 +253,7 @@ class CircleClient:
 
             return wallets
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to list wallets: {e}",
                 details={"api_error": str(e), "wallet_set_id": wallet_set_id},
@@ -238,7 +274,7 @@ class CircleClient:
 
             return balances
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to get wallet balances: {e}",
                 wallet_id=wallet_id,
@@ -283,18 +319,16 @@ class CircleClient:
             ciphertext = self._get_ciphertext()
 
             # Use correct SDK request class for developer wallets
-            request = (
-                developer_controlled_wallets.CreateTransferTransactionForDeveloperRequest.from_dict(
-                    {
-                        "idempotencyKey": idempotency_key,
-                        "entitySecretCiphertext": ciphertext,
-                        "walletId": wallet_id,
-                        "tokenId": token_id,
-                        "destinationAddress": destination_address,
-                        "amounts": [amount],
-                        "feeLevel": fee_level.value,  # Fee level at top level, not nested
-                    }
-                )
+            request = self._dcl.CreateTransferTransactionForDeveloperRequest.from_dict(
+                {
+                    "idempotencyKey": idempotency_key,
+                    "entitySecretCiphertext": ciphertext,
+                    "walletId": wallet_id,
+                    "tokenId": token_id,
+                    "destinationAddress": destination_address,
+                    "amounts": [amount],
+                    "feeLevel": fee_level.value,  # Fee level at top level, not nested
+                }
             )
             # Use correct API method for developer wallets
             response = self._transactions_api.create_developer_transaction_transfer(request)
@@ -302,7 +336,7 @@ class CircleClient:
             tx_data = response.data.to_dict()
             return TransactionInfo.from_api_response(tx_data)
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to create transfer: {e}",
                 wallet_id=wallet_id,
@@ -320,7 +354,7 @@ class CircleClient:
             tx_data = response.data.transaction.to_dict()
             return TransactionInfo.from_api_response(tx_data)
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise NetworkError(
                 f"Failed to get transaction {transaction_id}: {e}",
                 details={"api_error": str(e), "transaction_id": transaction_id},
@@ -349,7 +383,7 @@ class CircleClient:
 
             return transactions
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise NetworkError(
                 f"Failed to list transactions: {e}",
                 details={"api_error": str(e)},
@@ -398,7 +432,7 @@ class CircleClient:
 
             ciphertext = self._get_ciphertext()
 
-            request = developer_controlled_wallets.CreateContractExecutionTransactionForDeveloperRequest.from_dict(
+            request = self._dcl.CreateContractExecutionTransactionForDeveloperRequest.from_dict(
                 {
                     "idempotencyKey": idempotency_key,
                     "entitySecretCiphertext": ciphertext,
@@ -416,7 +450,7 @@ class CircleClient:
             tx_data = response.data.to_dict()
             return TransactionInfo.from_api_response(tx_data)
 
-        except developer_controlled_wallets.ApiException as e:
+        except self._dcl.ApiException as e:
             raise WalletError(
                 f"Failed to execute contract: {e}",
                 wallet_id=wallet_id,

@@ -295,8 +295,9 @@ class WalletSetInfo:
 
     id: str
     custody_type: CustodyType
-    create_date: datetime
-    update_date: datetime
+    name: str | None = None
+    create_date: datetime | None = None
+    update_date: datetime | None = None
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "WalletSetInfo":
@@ -312,6 +313,7 @@ class WalletSetInfo:
         return cls(
             id=data["id"],
             custody_type=CustodyType(data["custodyType"]),
+            name=data.get("name"),
             create_date=parse_dt(data.get("createDate")),
             update_date=parse_dt(data.get("updateDate")),
         )

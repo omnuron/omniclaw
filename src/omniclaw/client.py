@@ -272,6 +272,24 @@ class OmniClaw:
             return
 
         try:
+            # Pre-import and warmup Circle SDK to resolve all lazy modules before
+            # any parallel threads (asyncio.to_thread) try to import concurrently.
+            # The Circle Python SDK uses a lazy module loader that breaks when
+            # multiple threads trigger concurrent resolution of the same lazy module.
+            try:
+                from circle.web3 import developer_controlled_wallets, utils
+
+                warmup_client = utils.init_developer_controlled_wallets_client(
+                    api_key=self._config.circle_api_key,
+                    entity_secret=self._config.entity_secret,
+                )
+                # Force resolution of all lazy submodules by instantiating API classes
+                developer_controlled_wallets.WalletSetsApi(warmup_client)
+                developer_controlled_wallets.WalletsApi(warmup_client)
+                developer_controlled_wallets.TransactionsApi(warmup_client)
+            except Exception as warmup_exc:
+                self._logger.debug(f"Circle SDK warmup: {warmup_exc}")
+
             import httpx
 
             from omniclaw.protocols.nanopayments import (
@@ -405,7 +423,9 @@ class OmniClaw:
             return self._gateway_middleware
 
         # For Circle, we need nanopayments initialized
-        if (facilitator is None or facilitator == "circle") and (not self._nano_client or not self._nano_vault):
+        if (facilitator is None or facilitator == "circle") and (
+            not self._nano_client or not self._nano_vault
+        ):
             raise NanopaymentNotInitializedError()
 
         # If no seller_address provided, try to get from wallet
@@ -496,6 +516,7 @@ class OmniClaw:
                 seller_address=seller_address,
                 facilitator=facilitator,
             )
+
         price_str = price
 
         async def wrapper() -> PaymentInfo:
@@ -913,25 +934,52 @@ class OmniClaw:
         Returns:
             Tuple of (wallet_set, wallet_info)
         """
-        wallet_set, wallet = self._wallet_service.setup_agent_wallet(
-            agent_name=agent_name,
-            blockchain=blockchain,
+        # 10/10 RESILIENCE: setup_agent_wallet is SYNC and blocks.
+        # Offload to a thread so asyncio.gather can work in parallel.
+        # Use positional arguments for maximum compatibility across Python versions.
+        wallet_set, wallet = await asyncio.to_thread(
+            self._wallet_service.setup_agent_wallet,
+            agent_name,
+            blockchain,
         )
 
         if apply_default_guards:
             await self.apply_default_guards(wallet.id)
 
-        # Create nanopayment key so gateway operations work
+        # 10/10 RESILIENCE: Key generation can fail on slow RPCs (free Base nodes).
+        # We retry with exponential backoff to ensure the agent is ready.
         if self._nano_vault:
             key_alias = f"wallet-{wallet.id}"
-            try:
-                address = await self._nano_vault.generate_key(key_alias)
-                self._logger.info(
-                    f"Generated nanopayment key for wallet '{wallet.id}': "
-                    f"alias={key_alias}, address={address}"
-                )
-            except Exception as e:
-                self._logger.warning(f"Could not create nanopayment key: {e}")
+            max_retries = 5
+            base_delay = 3
+
+            for attempt in range(max_retries):
+                try:
+                    address = await self._nano_vault.generate_key(key_alias)
+                    self._logger.info(
+                        f"Generated nanopayment key for wallet '{wallet.id}': "
+                        f"alias={key_alias}, address={address} (Attempt {attempt + 1})"
+                    )
+                    break
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    if "already exists" in error_msg:
+                        self._logger.info(
+                            f"Nanopayment key already exists for wallet '{wallet.id}': "
+                            f"alias={key_alias}. Recovery successful."
+                        )
+                        break
+                        
+                    if attempt == max_retries - 1:
+                        self._logger.warning(
+                            f"Final attempt failed to create nanopayment key: {e}. Wallet will start in Degraded mode."
+                        )
+                    else:
+                        delay = base_delay * (2**attempt)
+                        self._logger.warning(
+                            f"Nanopayment key generation failed (Attempt {attempt + 1}): {e}. Retrying in {delay}s..."
+                        )
+                        await asyncio.sleep(delay)
 
         return wallet_set, wallet
 

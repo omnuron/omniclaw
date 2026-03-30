@@ -19,6 +19,13 @@ Usage:
     ... )
 """
 
+import warnings
+
+# Suppress noisy deprecation warnings from downstream dependencies (e.g. web3, circle-sdk)
+# We do this at the very top of the package to ensure it catches warnings during imports.
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
+
 from omniclaw.client import OmniClaw
 from omniclaw.core.config import Config
 from omniclaw.core.exceptions import (
@@ -140,7 +147,7 @@ from omniclaw.protocols.nanopayments import (
 )
 from omniclaw.trust.gate import TrustGate
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 __all__ = [
     # Main Client
     "OmniClaw",

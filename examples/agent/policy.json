@@ -2,9 +2,9 @@
   "version": "1.0",
   "tokens": {
     "payment-agent-token": {
-      "wallet_alias": "payment-agent",
+      "wallet_alias": "omni-bot-v4",
       "active": true,
-      "label": "Main Payment Agent"
+      "label": "Main Omni Bot"
     },
     "api-agent-token": {
       "wallet_alias": "api-agent", 
@@ -18,9 +18,9 @@
     }
   },
   "wallets": {
-    "payment-agent": {
-      "name": "Main Payment Agent",
-      "description": "Primary agent for general payments",
+    "omni-bot-v4": {
+      "name": "Omni Bot V1",
+      "description": "Upgraded autonomous bot",
       "limits": {
         "daily_max": "100.00",
         "hourly_max": "50.00",

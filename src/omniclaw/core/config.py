@@ -47,7 +47,7 @@ class Config:
     gateway_api_url: str = "https://gateway-api-testnet.circle.com/v1"
 
     # Timeouts (seconds)
-    request_timeout: float = 30.0
+    request_timeout: float = 60.0
     transaction_poll_interval: float = 2.0
     transaction_poll_timeout: float = 120.0
 

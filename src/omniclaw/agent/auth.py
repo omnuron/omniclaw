@@ -34,15 +34,12 @@ class TokenAuth:
         self,
         credentials: HTTPAuthorizationCredentials,
     ) -> AuthenticatedAgent:
-        """Authenticate request using token."""
+        """Authenticate request using token against the policy mapping."""
         token = credentials.credentials
 
-        if not self._agent_token or token != self._agent_token:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        wallet_id = self._policy.get_wallet_id()
+        wallet_id = self._policy.get_wallet_id_for_token(token)
         if not wallet_id:
-            raise HTTPException(status_code=400, detail="Wallet not initialized")
+            raise HTTPException(status_code=401, detail="Invalid or unauthorized token")
 
         return AuthenticatedAgent(
             token=token,

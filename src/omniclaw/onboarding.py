@@ -34,14 +34,21 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from logging import Logger
 
-# Circle SDK utilities for entity secret management
-try:
-    from circle.web3 import utils as circle_utils
+# Circle SDK availability check (fully deferred to avoid circular import)
+CIRCLE_SDK_AVAILABLE: bool | None = None
 
-    CIRCLE_SDK_AVAILABLE = True
-except ImportError:
-    CIRCLE_SDK_AVAILABLE = False
-    circle_utils = None
+
+def _check_circle_sdk() -> bool:
+    """Lazily check if Circle SDK is installed."""
+    global CIRCLE_SDK_AVAILABLE
+    if CIRCLE_SDK_AVAILABLE is None:
+        try:
+            import importlib.util
+
+            CIRCLE_SDK_AVAILABLE = importlib.util.find_spec("circle.web3") is not None
+        except Exception:
+            CIRCLE_SDK_AVAILABLE = False
+    return CIRCLE_SDK_AVAILABLE
 
 
 MANAGED_CREDENTIALS_FILE = "credentials.json"
@@ -193,7 +200,7 @@ def load_managed_entity_secret(api_key: str) -> str | None:
 def resolve_entity_secret(api_key: str | None = None) -> str | None:
     """
     Find the best available entity secret for the current session.
-    
+
     Resolution order:
     1. OS environment (ENTITY_SECRET)
     2. Managed store (matching CIRCLE_API_KEY)
@@ -202,12 +209,12 @@ def resolve_entity_secret(api_key: str | None = None) -> str | None:
     env_secret = os.getenv("ENTITY_SECRET")
     if env_secret:
         return env_secret
-        
+
     # 2. Managed store fallback
     resolved_api_key = api_key or os.getenv("CIRCLE_API_KEY")
     if resolved_api_key:
         return load_managed_entity_secret(resolved_api_key)
-        
+
     return None
 
 
@@ -294,7 +301,7 @@ def register_entity_secret(
     Raises:
         SetupError: If Circle SDK not installed or registration fails
     """
-    if not CIRCLE_SDK_AVAILABLE:
+    if not _check_circle_sdk():
         raise SetupError(
             "Circle SDK not installed. Run: pip install circle-developer-controlled-wallets"
         )
@@ -319,6 +326,8 @@ def register_entity_secret(
     existing_files = set(recovery_dir.glob("recovery_file_*.dat"))
 
     try:
+        from circle.web3 import utils as circle_utils
+
         result = circle_utils.register_entity_secret_ciphertext(
             api_key=api_key,
             entity_secret=entity_secret,
@@ -612,7 +621,7 @@ def verify_setup() -> dict[str, bool]:
         Dict with status of each requirement and 'ready' boolean
     """
     results = {
-        "circle_sdk_installed": CIRCLE_SDK_AVAILABLE,
+        "circle_sdk_installed": _check_circle_sdk(),
         "api_key_set": bool(os.getenv("CIRCLE_API_KEY")),
         "entity_secret_set": bool(os.getenv("ENTITY_SECRET")),
     }
@@ -662,8 +671,8 @@ def doctor(
         warnings.append("Environment ENTITY_SECRET does not match the managed config copy.")
 
     return {
-        "ready": bool(resolved_api_key and active_secret and CIRCLE_SDK_AVAILABLE),
-        "circle_sdk_installed": CIRCLE_SDK_AVAILABLE,
+        "ready": bool(resolved_api_key and active_secret and _check_circle_sdk()),
+        "circle_sdk_installed": _check_circle_sdk(),
         "config_dir": str(config_dir),
         "managed_credentials_path": str(credentials_path),
         "api_key_set": bool(resolved_api_key),

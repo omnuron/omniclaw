@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import warnings
 
-# Suppress deprecation warnings from downstream dependencies (e.g. web3 using pkg_resources)
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
+# Aggressively suppress noisy deprecation warnings from downstream dependencies (e.g. web3, circle-sdk)
+# This must happen before any third-party imports.
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module="web3")
 
 import base64
 import json
