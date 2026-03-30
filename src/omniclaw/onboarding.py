@@ -193,7 +193,7 @@ def load_managed_entity_secret(api_key: str) -> str | None:
 def resolve_entity_secret(api_key: str | None = None) -> str | None:
     """
     Find the best available entity secret for the current session.
-    
+
     Resolution order:
     1. OS environment (ENTITY_SECRET)
     2. Managed store (matching CIRCLE_API_KEY)
@@ -202,12 +202,12 @@ def resolve_entity_secret(api_key: str | None = None) -> str | None:
     env_secret = os.getenv("ENTITY_SECRET")
     if env_secret:
         return env_secret
-        
+
     # 2. Managed store fallback
     resolved_api_key = api_key or os.getenv("CIRCLE_API_KEY")
     if resolved_api_key:
         return load_managed_entity_secret(resolved_api_key)
-        
+
     return None
 
 
@@ -740,7 +740,7 @@ def print_doctor_status(
         for step in next_steps:
             print(f"  - {step}")
         if status.get("can_sync_to_env"):
-            print("\n  💡 TIP: You have a saved Entity Secret but it's not in your environment.")
+            print("\n  ð¡ TIP: You have a saved Entity Secret but it's not in your environment.")
             print("     Run: omniclaw setup  # to sync it automatically")
         print()
 

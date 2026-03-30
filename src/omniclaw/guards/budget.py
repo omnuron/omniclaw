@@ -72,8 +72,6 @@ class BudgetGuard(Guard):
         # For simplicity and robustness, we query the LEDGER (truth)
         # Assuming we can query the associated StorageLedger via shared storage
 
-
-
         # Get all successful payments
         # In a real optimized system, we'd use aggregation queries, but
         # StorageBackend is simple CRUD. So we fetch recent records.
@@ -117,8 +115,6 @@ class BudgetGuard(Guard):
         """Get amount spent in last 24 hours."""
         return await self._get_spent(wallet_id, timedelta(days=1))
 
-
-
     async def check(self, context: PaymentContext) -> GuardResult:
         """Check if payment fits within budget limits."""
         amount = context.amount
@@ -128,8 +124,12 @@ class BudgetGuard(Guard):
         if self._hourly_limit is not None:
             hourly_spent = await self.get_hourly_spent(wallet_id)
             if hourly_spent + amount > self._hourly_limit:
-                event_emitter.emit_background("guard.budget_exceeded", wallet_id, payload={"amount": str(amount)})
-                event_emitter.emit_background("payment.guard_evaluated", wallet_id, payload={"result": "FAIL"})
+                event_emitter.emit_background(
+                    "guard.budget_exceeded", wallet_id, payload={"amount": str(amount)}
+                )
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", wallet_id, payload={"result": "FAIL"}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=(
@@ -150,8 +150,12 @@ class BudgetGuard(Guard):
         if self._daily_limit is not None:
             daily_spent = await self.get_daily_spent(wallet_id)
             if daily_spent + amount > self._daily_limit:
-                event_emitter.emit_background("guard.budget_exceeded", wallet_id, payload={"amount": str(amount)})
-                event_emitter.emit_background("payment.guard_evaluated", wallet_id, payload={"result": "FAIL"})
+                event_emitter.emit_background(
+                    "guard.budget_exceeded", wallet_id, payload={"amount": str(amount)}
+                )
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", wallet_id, payload={"result": "FAIL"}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=(
@@ -172,8 +176,12 @@ class BudgetGuard(Guard):
         if self._total_limit is not None:
             total_spent = await self.get_total_spent(wallet_id)
             if total_spent + amount > self._total_limit:
-                event_emitter.emit_background("guard.budget_exceeded", wallet_id, payload={"amount": str(amount)})
-                event_emitter.emit_background("payment.guard_evaluated", wallet_id, payload={"result": "FAIL"})
+                event_emitter.emit_background(
+                    "guard.budget_exceeded", wallet_id, payload={"amount": str(amount)}
+                )
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", wallet_id, payload={"result": "FAIL"}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=(
@@ -195,14 +203,24 @@ class BudgetGuard(Guard):
             hourly = await self.get_hourly_spent(wallet_id)
             remaining["hourly"] = self._hourly_limit - hourly
             if remaining["hourly"] < self._hourly_limit * Decimal("0.2"):
-                event_emitter.emit_background("guard.budget_limit_approaching", wallet_id, payload={"remaining": str(remaining["hourly"])})
+                event_emitter.emit_background(
+                    "guard.budget_limit_approaching",
+                    wallet_id,
+                    payload={"remaining": str(remaining["hourly"])},
+                )
         if self._daily_limit is not None:
             daily = await self.get_daily_spent(wallet_id)
             remaining["daily"] = self._daily_limit - daily
             if remaining["daily"] < self._daily_limit * Decimal("0.2"):
-                event_emitter.emit_background("guard.budget_limit_approaching", wallet_id, payload={"remaining": str(remaining["daily"])})
+                event_emitter.emit_background(
+                    "guard.budget_limit_approaching",
+                    wallet_id,
+                    payload={"remaining": str(remaining["daily"])},
+                )
 
-        event_emitter.emit_background("payment.guard_evaluated", wallet_id, payload={"result": "PASS"})
+        event_emitter.emit_background(
+            "payment.guard_evaluated", wallet_id, payload={"result": "PASS"}
+        )
         return GuardResult(
             allowed=True,
             guard_name=self.name,

@@ -86,7 +86,9 @@ def is_effective_success_status(status: PaymentStatus) -> bool:
     return is_irreversible_success_status(status) or is_accepted_inflight_status(status)
 
 
-def ensure_payment_transition(current: PaymentStatus, new: PaymentStatus, *, context: str = "payment") -> None:
+def ensure_payment_transition(
+    current: PaymentStatus, new: PaymentStatus, *, context: str = "payment"
+) -> None:
     """Validate payment state transition and raise ValidationError if invalid."""
     if current == new:
         return

@@ -1,0 +1,12 @@
+# Pre-commit hooks for OmniClaw
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+# See: https://docs.astral.sh/ruff/

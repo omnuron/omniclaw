@@ -405,7 +405,9 @@ class OmniClaw:
             return self._gateway_middleware
 
         # For Circle, we need nanopayments initialized
-        if (facilitator is None or facilitator == "circle") and (not self._nano_client or not self._nano_vault):
+        if (facilitator is None or facilitator == "circle") and (
+            not self._nano_client or not self._nano_vault
+        ):
             raise NanopaymentNotInitializedError()
 
         # If no seller_address provided, try to get from wallet
@@ -496,6 +498,7 @@ class OmniClaw:
                 seller_address=seller_address,
                 facilitator=facilitator,
             )
+
         price_str = price
 
         async def wrapper() -> PaymentInfo:

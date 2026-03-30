@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 @dataclass
 class WalletLimits:
     """Spending limits for a wallet."""
+
     daily_max: Decimal | None = None
     hourly_max: Decimal | None = None
     per_tx_max: Decimal | None = None
@@ -37,6 +38,7 @@ class WalletLimits:
 @dataclass
 class RateLimits:
     """Rate limits for a wallet."""
+
     per_minute: int | None = None
     per_hour: int | None = None
 
@@ -53,6 +55,7 @@ class RateLimits:
 @dataclass
 class RecipientConfig:
     """Recipient whitelist/blacklist configuration."""
+
     mode: str = "whitelist"  # "whitelist" or "blacklist"
     addresses: list[str] = field(default_factory=list)
     domains: list[str] = field(default_factory=list)
@@ -71,6 +74,7 @@ class RecipientConfig:
 @dataclass
 class Policy:
     """Main policy configuration for the single agent wallet."""
+
     version: str = "2.0"
     limits: WalletLimits = field(default_factory=WalletLimits)
     rate_limits: RateLimits = field(default_factory=RateLimits)
@@ -86,12 +90,15 @@ class Policy:
             limits=WalletLimits.from_dict(data.get("limits")),
             rate_limits=RateLimits.from_dict(data.get("rate_limits")),
             recipients=RecipientConfig.from_dict(data.get("recipients")),
-            confirm_threshold=Decimal(data.get("confirm_threshold", "0")) if data.get("confirm_threshold") else None,
+            confirm_threshold=Decimal(data.get("confirm_threshold", "0"))
+            if data.get("confirm_threshold")
+            else None,
         )
 
 
 class PolicyManager:
     """Manages policy loading, validation, and wallet operations."""
+
     def __init__(self, policy_path: str | None = None):
         self._policy_path = policy_path or os.environ.get(
             "OMNICLAW_AGENT_POLICY_PATH", "/config/policy.json"
@@ -108,7 +115,7 @@ class PolicyManager:
             self._policy = Policy()
             return self._policy
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
         self._policy = Policy.from_dict(data)
@@ -175,6 +182,7 @@ class PolicyManager:
 
 class WalletManager:
     """Manages wallet creation based on policy."""
+
     def __init__(self, policy_manager: PolicyManager, omniclaw_client: Any):
         self._policy = policy_manager
         self._client = omniclaw_client
@@ -191,7 +199,7 @@ class WalletManager:
                     agent_name="omniclaw-primary-agent",
                     apply_default_guards=False,
                 )
-            
+
             self._policy.set_wallet_id(wallet.id)
             self._logger.info(f"Wallet successfully initialized: {wallet.id}")
             return {"status": "success", "wallet_id": wallet.id}

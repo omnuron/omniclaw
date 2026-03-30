@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from fastapi import HTTPException, Security
+from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from omniclaw.agent.policy import PolicyManager
@@ -28,7 +28,10 @@ class TokenAuth:
         self._agent_token = os.environ.get("OMNICLAW_AGENT_TOKEN")
         if not self._agent_token:
             import logging
-            logging.getLogger(__name__).warning("OMNICLAW_AGENT_TOKEN not set! Authentication will fail.")
+
+            logging.getLogger(__name__).warning(
+                "OMNICLAW_AGENT_TOKEN not set! Authentication will fail."
+            )
 
     async def authenticate(
         self,

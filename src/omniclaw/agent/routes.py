@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from omniclaw.agent.auth import AuthenticatedAgent, TokenAuth
 from omniclaw.agent.models import (
@@ -40,22 +41,25 @@ router = APIRouter(prefix="/api/v1", tags=["agent"])
 async def get_policy_manager(request: Request) -> PolicyManager:
     return request.app.state.policy_mgr
 
+
 async def get_wallet_manager(request: Request) -> WalletManager:
     return request.app.state.wallet_mgr
+
 
 async def get_token_auth(request: Request) -> TokenAuth:
     return request.app.state.auth
 
-async def get_omniclaw_client(request: Request) -> "OmniClaw":
+
+async def get_omniclaw_client(request: Request) -> OmniClaw:
     return request.app.state.client
 
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 security = HTTPBearer()
 
+
 async def get_current_agent(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth: TokenAuth = Depends(get_token_auth)
+    auth: TokenAuth = Depends(get_token_auth),
 ) -> AuthenticatedAgent:
     return await auth.authenticate(credentials)
 
@@ -102,7 +106,7 @@ async def pay(
     agent: AuthenticatedAgent = Depends(get_current_agent),
     wallet_mgr: WalletManager = Depends(get_wallet_manager),
     policy_mgr: PolicyManager = Depends(get_policy_manager),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     if not policy_mgr.is_valid_recipient(request.recipient):
         raise HTTPException(status_code=400, detail="Recipient not allowed by policy")
@@ -157,10 +161,12 @@ async def simulate(
     request: SimulateRequest,
     agent: AuthenticatedAgent = Depends(get_current_agent),
     policy_mgr: PolicyManager = Depends(get_policy_manager),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     if not policy_mgr.is_valid_recipient(request.recipient):
-        return SimulateResponse(would_succeed=False, route="TRANSFER", reason="Recipient not allowed by policy")
+        return SimulateResponse(
+            would_succeed=False, route="TRANSFER", reason="Recipient not allowed by policy"
+        )
 
     amount = Decimal(request.amount)
     allowed, reason = policy_mgr.check_limits(amount)
@@ -190,7 +196,7 @@ async def simulate(
 async def list_transactions(
     limit: int = 20,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     try:
         transactions = await client.list_transactions(wallet_id=agent.wallet_id)
@@ -212,7 +218,7 @@ async def list_transactions(
             total=len(transactions),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/intents", response_model=IntentResponse)
@@ -220,7 +226,7 @@ async def create_intent(
     request: CreateIntentRequest,
     agent: AuthenticatedAgent = Depends(get_current_agent),
     policy_mgr: PolicyManager = Depends(get_policy_manager),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     if not policy_mgr.is_valid_recipient(request.recipient):
         raise HTTPException(status_code=400, detail="Recipient not allowed by policy")
@@ -239,7 +245,7 @@ async def create_intent(
             expires_in=request.expires_in,
             idempotency_key=request.idempotency_key,
             check_trust=request.check_trust,
-            ** (request.metadata or {}),
+            **(request.metadata or {}),
         )
 
         return IntentResponse(
@@ -251,14 +257,14 @@ async def create_intent(
             expires_at=intent.expires_at.isoformat() if intent.expires_at else None,
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/intents/{intent_id}", response_model=IntentResponse)
 async def get_intent(
     intent_id: str,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     try:
         intent = await client.get_payment_intent(intent_id)
@@ -279,14 +285,14 @@ async def get_intent(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/intents/{intent_id}/confirm", response_model=PayResponse)
 async def confirm_intent(
     intent_id: str,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     try:
         intent = await client.get_payment_intent(intent_id)
@@ -311,14 +317,14 @@ async def confirm_intent(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/intents/{intent_id}", response_model=IntentResponse)
 async def cancel_intent(
     intent_id: str,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     try:
         intent = await client.get_payment_intent(intent_id)
@@ -335,13 +341,15 @@ async def cancel_intent(
             wallet_id=cancelled.wallet_id,
             recipient=cancelled.recipient,
             amount=str(cancelled.amount),
-            status=cancelled.status.value if hasattr(cancelled.status, "value") else str(cancelled.status),
+            status=cancelled.status.value
+            if hasattr(cancelled.status, "value")
+            else str(cancelled.status),
             expires_at=cancelled.expires_at.isoformat() if cancelled.expires_at else None,
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/can-pay", response_model=CanPayResponse)
@@ -366,10 +374,10 @@ async def list_wallets(
     address = await wallet_mgr.get_wallet_address()
     wallet_id = policy_mgr.get_wallet_id()
     policy = policy_mgr.get_policy()
-    
+
     # Send a mock policy block for the CLI display
     policy_dict = policy.to_dict()
-    
+
     wallets = [
         WalletInfo(
             alias="primary",
@@ -381,17 +389,20 @@ async def list_wallets(
     ]
 
     return ListWalletsResponse(wallets=wallets)
+
+
 @router.post("/x402/pay", response_model=PayResponse)
 async def x402_pay(
     request: X402PayRequest,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     """Execute an automated x402 payment flow."""
     try:
         from omniclaw.protocols.x402 import X402Adapter
+
         adapter = X402Adapter(client.config, client.wallet_service)
-        
+
         result = await adapter.execute(
             wallet_id=agent.wallet_id,
             recipient=request.url,
@@ -428,7 +439,7 @@ async def x402_pay(
 async def x402_verify(
     request: X402VerifyRequest,
     agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: "OmniClaw" = Depends(get_omniclaw_client),
+    client: OmniClaw = Depends(get_omniclaw_client),
 ):
     """Verify an incoming x402 payment signature (for 'omniclaw-cli serve')."""
     # This is a stub for now, in a real implementation it would verify the signature

@@ -40,7 +40,7 @@ def print_env_vars():
     print("Required:")
     for var, desc in ENV_VARS["required"].items():
         value = os.environ.get(var, "")
-        status = f"✓ {value[:20]}..." if value else "✗ not set"
+        status = f"â {value[:20]}..." if value else "â not set"
         print(f"  {var}")
         print(f"    {desc}")
         print(f"    {status}\n")
@@ -48,7 +48,7 @@ def print_env_vars():
     print("\nOptional:")
     for var, desc in ENV_VARS["optional"].items():
         value = os.environ.get(var, "")
-        status = f"✓ {value[:30]}..." if value else "○ default"
+        status = f"â {value[:30]}..." if value else "â default"
         print(f"  {var}")
         print(f"    {desc}")
         print(f"    {status}\n")
@@ -56,7 +56,7 @@ def print_env_vars():
     print("\nProduction:")
     for var, desc in ENV_VARS["production"].items():
         value = os.environ.get(var, "")
-        status = f"✓ {value[:30]}..." if value else "○ not set"
+        status = f"â {value[:30]}..." if value else "â not set"
         print(f"  {var}")
         print(f"    {desc}")
         print(f"    {status}\n")
@@ -92,7 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Quickly set up your Control Plane credentials (.env.agent)",
     )
     setup_parser.add_argument("--api-key", help="Circle API Key")
-    setup_parser.add_argument("--network", default="ARC-TESTNET", help="Circle Network (default: ARC-TESTNET)")
+    setup_parser.add_argument(
+        "--network", default="ARC-TESTNET", help="Circle Network (default: ARC-TESTNET)"
+    )
 
     server_parser = subparsers.add_parser(
         "server",
@@ -108,31 +110,34 @@ def build_parser() -> argparse.ArgumentParser:
 def handle_setup(args: argparse.Namespace) -> int:
     """Handle the setup command."""
     from omniclaw.onboarding import resolve_entity_secret, create_env_file
-    
+
     api_key = args.api_key or os.getenv("CIRCLE_API_KEY")
     if not api_key:
         api_key = input("Enter your Circle API Key: ").strip()
-    
+
     if not api_key:
-        print("❌ Error: Circle API Key is required.")
+        print("â Error: Circle API Key is required.")
         return 1
-        
+
     entity_secret = resolve_entity_secret(api_key)
     if entity_secret:
-        print("✅ Found existing Entity Secret in managed store.")
+        print("â Found existing Entity Secret in managed store.")
     else:
-        print("💡 No Entity Secret found for this API key.")
-        entity_secret = input("Enter your 64-char Entity Secret (or press Enter to generate): ").strip()
+        print("ð¡ No Entity Secret found for this API key.")
+        entity_secret = input(
+            "Enter your 64-char Entity Secret (or press Enter to generate): "
+        ).strip()
         if not entity_secret:
             from omniclaw.onboarding import auto_setup_entity_secret
-            print("🚀 Generating and registering new Entity Secret...")
+
+            print("ð Generating and registering new Entity Secret...")
             entity_secret = auto_setup_entity_secret(api_key)
 
     env_path = ".env.agent"
     create_env_file(api_key, entity_secret, env_path=env_path, network=args.network, overwrite=True)
-    print(f"✨ Successfully configured {env_path}!")
-    print(f"To start the server locally, run: omniclaw server")
-    print(f"To start via Docker, run: docker compose -f docker-compose.agent.yml up -d")
+    print(f"â¨ Successfully configured {env_path}!")
+    print("To start the server locally, run: omniclaw server")
+    print("To start via Docker, run: docker compose -f docker-compose.agent.yml up -d")
     return 0
 
 
@@ -141,34 +146,34 @@ def handle_server(args: argparse.Namespace) -> int:
     import uvicorn
     from dotenv import load_dotenv
     from omniclaw.onboarding import resolve_entity_secret, auto_setup_entity_secret
-    
+
     # Load .env.agent if it exists
     if os.path.exists(".env.agent"):
         load_dotenv(".env.agent")
-        print("📝 Loaded configuration from .env.agent")
+        print("ð Loaded configuration from .env.agent")
     elif os.path.exists(".env"):
         load_dotenv(".env")
-        print("📝 Loaded configuration from .env")
+        print("ð Loaded configuration from .env")
 
     # Auto-Setup Logic: Check if we have an API key but no Entity Secret
     api_key = os.getenv("CIRCLE_API_KEY")
     entity_secret = os.getenv("ENTITY_SECRET")
-    
+
     if api_key and not entity_secret:
-        print("💡 Found API Key but no Entity Secret. Attempting auto-setup...")
+        print("ð¡ Found API Key but no Entity Secret. Attempting auto-setup...")
         entity_secret = resolve_entity_secret(api_key)
         if not entity_secret:
-            print("🚀 Generating new Entity Secret for this machine...")
+            print("ð Generating new Entity Secret for this machine...")
             entity_secret = auto_setup_entity_secret(api_key)
-        
+
         if entity_secret:
             os.environ["ENTITY_SECRET"] = entity_secret
-            print("✅ Credentials verified and injected.")
+            print("â Credentials verified and injected.")
         else:
-            print("❌ Error: Failed to resolve or generate Entity Secret.")
+            print("â Error: Failed to resolve or generate Entity Secret.")
             return 1
 
-    print(f"🚀 Starting OmniClaw Control Plane on {args.host}:{args.port}...")
+    print(f"ð Starting OmniClaw Control Plane on {args.host}:{args.port}...")
     uvicorn.run(
         "omniclaw.agent.server:app",
         host=args.host,
@@ -195,7 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "env":
         print_env_vars()
         return 0
-        
+
     if args.command == "setup":
         return handle_setup(args)
 

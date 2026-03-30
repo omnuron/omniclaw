@@ -10,8 +10,7 @@ class BaseEventEmitter(Protocol):
         correlation_id: str | None = None,
         severity: str = "info",
         agent_id: str | None = None,
-    ) -> str:
-        ...
+    ) -> str: ...
 
     def emit_background(
         self,
@@ -21,8 +20,8 @@ class BaseEventEmitter(Protocol):
         correlation_id: str | None = None,
         severity: str = "info",
         agent_id: str | None = None,
-    ) -> None:
-        ...
+    ) -> None: ...
+
 
 class NullEventEmitter:
     async def emit(
@@ -47,14 +46,18 @@ class NullEventEmitter:
     ) -> None:
         pass
 
+
 _emitter: BaseEventEmitter = NullEventEmitter()
+
 
 def set_emitter(emitter: BaseEventEmitter) -> None:
     global _emitter
     _emitter = emitter
 
+
 def get_emitter() -> BaseEventEmitter:
     return _emitter
+
 
 class ProxyEventEmitter:
     async def emit(
@@ -82,5 +85,6 @@ class ProxyEventEmitter:
         get_emitter().emit_background(
             event_type, wallet_id, payload, correlation_id, severity, agent_id
         )
+
 
 event_emitter = ProxyEventEmitter()

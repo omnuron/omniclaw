@@ -38,7 +38,9 @@ class ReservationService:
         """
         self._storage = storage
 
-    async def reserve(self, wallet_id: str, amount: Decimal, intent_id: str, expires_at: datetime | None = None) -> str:
+    async def reserve(
+        self, wallet_id: str, amount: Decimal, intent_id: str, expires_at: datetime | None = None
+    ) -> str:
         """
         Create a fund reservation.
 
@@ -101,9 +103,15 @@ class ReservationService:
             if "expires_at" in res:
                 try:
                     expiration_raw = datetime.fromisoformat(res["expires_at"])
-                    expiration = expiration_raw.replace(tzinfo=None) if expiration_raw.tzinfo else expiration_raw
+                    expiration = (
+                        expiration_raw.replace(tzinfo=None)
+                        if expiration_raw.tzinfo
+                        else expiration_raw
+                    )
                     if now > expiration:
-                        logger.info(f"Sweeping mathematically expired reservation: {res.get('intent_id')}")
+                        logger.info(
+                            f"Sweeping mathematically expired reservation: {res.get('intent_id')}"
+                        )
                         await self.release(res.get("intent_id", ""))
                         continue
                 except Exception:

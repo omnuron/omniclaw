@@ -35,7 +35,12 @@ GAS_REQUIREMENTS: dict[Network, Decimal] = {
 
 def get_network_gas_token(network: Network) -> str:
     """Get the native gas token name for a network."""
-    if network in [Network.ETH, Network.ETH_SEPOLIA] or network in [Network.OP, Network.OP_SEPOLIA] or network in [Network.ARB, Network.ARB_SEPOLIA] or network in [Network.BASE, Network.BASE_SEPOLIA]:
+    if (
+        network in [Network.ETH, Network.ETH_SEPOLIA]
+        or network in [Network.OP, Network.OP_SEPOLIA]
+        or network in [Network.ARB, Network.ARB_SEPOLIA]
+        or network in [Network.BASE, Network.BASE_SEPOLIA]
+    ):
         return "ETH"
     elif network in [Network.AVAX, Network.AVAX_FUJI]:
         return "AVAX"
@@ -48,9 +53,7 @@ def get_network_gas_token(network: Network) -> str:
 
 
 def check_gas_requirements(
-    network: Network,
-    native_balance: Decimal,
-    operation: str = "CCTP transfer"
+    network: Network, native_balance: Decimal, operation: str = "CCTP transfer"
 ) -> tuple[bool, str]:
     """
     Check if a wallet has sufficient gas for an operation.
@@ -102,17 +105,23 @@ def estimate_cctp_gas_cost(network: Network) -> dict[str, Decimal]:
             "approval": Decimal("0.001"),
             "burn": Decimal("0.002"),
             "total": Decimal("0.003"),
-            "token": "USDC"
+            "token": "USDC",
         }
 
     # L2 networks (cheaper)
-    if network in [Network.OP, Network.OP_SEPOLIA, Network.ARB, Network.ARB_SEPOLIA,
-                   Network.BASE, Network.BASE_SEPOLIA]:
+    if network in [
+        Network.OP,
+        Network.OP_SEPOLIA,
+        Network.ARB,
+        Network.ARB_SEPOLIA,
+        Network.BASE,
+        Network.BASE_SEPOLIA,
+    ]:
         return {
             "approval": Decimal("0.0001"),
             "burn": Decimal("0.0002"),
             "total": Decimal("0.0003"),
-            "token": gas_token
+            "token": gas_token,
         }
 
     # L1 networks (more expensive)
@@ -120,5 +129,5 @@ def estimate_cctp_gas_cost(network: Network) -> dict[str, Decimal]:
         "approval": Decimal("0.002"),
         "burn": Decimal("0.003"),
         "total": Decimal("0.005"),
-        "token": gas_token
+        "token": gas_token,
     }

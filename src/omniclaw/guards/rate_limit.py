@@ -169,8 +169,14 @@ class RateLimitGuard(Guard):
             limit = getattr(self, f"_max_per_{limit_type}")
             current = await self._get_count(key)
             if current >= limit:
-                event_emitter.emit_background("guard.rate_limit_hit", context.wallet_id, payload={"limit_type": limit_type, "current": current, "limit": limit})
-                event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, payload={"result": "FAIL"})
+                event_emitter.emit_background(
+                    "guard.rate_limit_hit",
+                    context.wallet_id,
+                    payload={"limit_type": limit_type, "current": current, "limit": limit},
+                )
+                event_emitter.emit_background(
+                    "payment.guard_evaluated", context.wallet_id, payload={"result": "FAIL"}
+                )
                 return GuardResult(
                     allowed=False,
                     reason=f"Rate limit exceeded ({limit_type}): {current}/{limit}",
@@ -178,7 +184,9 @@ class RateLimitGuard(Guard):
                     metadata={"limit_type": limit_type, "current": current, "limit": limit},
                 )
 
-        event_emitter.emit_background("payment.guard_evaluated", context.wallet_id, payload={"result": "PASS"})
+        event_emitter.emit_background(
+            "payment.guard_evaluated", context.wallet_id, payload={"result": "PASS"}
+        )
         return GuardResult(allowed=True, guard_name=self.name)
 
     async def record_payment(self, wallet_id: str) -> None:

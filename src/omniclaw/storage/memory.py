@@ -151,7 +151,7 @@ class InMemoryStorage(StorageBackend):
         try:
             current_dec = Decimal(str(current_val)) if current_val is not None else Decimal("0")
         except Exception:
-             # If it's a dict or invalid, start from 0
+            # If it's a dict or invalid, start from 0
             current_dec = Decimal("0")
 
         delta = Decimal(amount)

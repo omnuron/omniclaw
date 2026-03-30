@@ -35,9 +35,7 @@ class RedisStreamClient:
             try:
                 import redis.asyncio as aioredis
 
-                self._client = aioredis.from_url(
-                    self._redis_url, decode_responses=True
-                )
+                self._client = aioredis.from_url(self._redis_url, decode_responses=True)
             except ImportError:
                 logger.error("redis package not installed. Install with: pip install redis")
                 raise
@@ -113,9 +111,7 @@ class RedisStreamClient:
         """
         client = await self._get_client()
         try:
-            await client.xgroup_create(
-                stream_key, group_name, id=start_id, mkstream=mkstream
-            )
+            await client.xgroup_create(stream_key, group_name, id=start_id, mkstream=mkstream)
             return True
         except Exception as e:
             if "BUSYGROUP" in str(e):

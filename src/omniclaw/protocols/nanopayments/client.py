@@ -775,6 +775,7 @@ class NanopaymentClient:
             total = _to_int(balance_str)
             available = total  # Gateway balance is fully available
             from decimal import Decimal
+
             formatted_total = f"{Decimal(total) / Decimal(1_000_000):.6f} USDC"
             formatted_available = formatted_total
         return GatewayBalance(
