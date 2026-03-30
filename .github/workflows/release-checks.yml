@@ -30,16 +30,15 @@ jobs:
       - name: Verify package contents
         run: |
           ls -la dist/
-          # Ensure both sdist and wheel were created
           test -f dist/*.tar.gz
           test -f dist/*.whl
 
       - name: Check package metadata
         run: |
-          pip install --break-system-packages twine
-          twine check dist/*
+          uv pip install twine
+          uv run twine check dist/*
 
       - name: Test install from wheel
         run: |
-          pip install --break-system-packages dist/*.whl
-          python -c "import omniclaw; print(f'omniclaw installed successfully')"
+          uv pip install dist/*.whl --force-reinstall
+          uv run python -c "import omniclaw; print('omniclaw installed successfully')"
