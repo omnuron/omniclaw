@@ -28,7 +28,7 @@ Based on `enterprise-dashboard.md`:
 
 ### Developer Integration Surface
 
-- TypeScript SDK (parity with Python)
+- TypeScript / Node.js SDK
 - MCP server (production-ready)
 - `omniclaw` CLI for setup, diagnostics, and ops
 - agent skills library and templates

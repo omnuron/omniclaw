@@ -7,8 +7,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resou
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 
 import argparse
-import os
 from collections.abc import Sequence
+import os
 
 from omniclaw.onboarding import print_doctor_status
 

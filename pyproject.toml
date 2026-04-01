@@ -115,7 +115,6 @@ addopts = "-v --tb=short -p no:pytest_ethereum"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]

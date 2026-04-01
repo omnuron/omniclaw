@@ -1,0 +1,47 @@
+{
+  "name": "omniclaw",
+  "version": "0.1.0",
+  "description": "The Payment Infrastructure Layer for Autonomous AI Agents (Node.js SDK)",
+  "license": "MIT",
+  "author": "Omnuron AI Team",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "ai",
+    "payments",
+    "usdc",
+    "circle",
+    "agent",
+    "x402",
+    "automation"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "release:check": "npm run typecheck && npm run build && npm pack",
+    "smoke:validate": "npm run build && node ./dist/scripts/smokeTest.js"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  }
+}
