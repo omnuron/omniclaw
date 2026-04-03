@@ -32,20 +32,8 @@ from app.payments.omniclaw_client import OmniclawPaymentClient
 
 logger = structlog.get_logger(__name__)
 
-mcp = FastMCP(
-    name="OmniClaw MCP Server",
-    instructions=(
-        "Production MCP server for Omniclaw SDK agent operations: "
-        "wallet management, guarded payments, payment intents, "
-        "transaction sync, and trust checks."
-    ),
-    auth=get_auth_provider() if settings.MCP_REQUIRE_AUTH else None,
-)
-
-
-@mcp.on_startup()
-async def on_startup() -> None:
-    """Initialize the Omniclaw client on startup."""
+async def mcp_lifespan(server: FastMCP):
+    """Lifecycle manager for the MCP server resources."""
     logger.info(
         "mcp_startup_init",
         env=settings.ENVIRONMENT,
@@ -54,7 +42,7 @@ async def on_startup() -> None:
     )
 
     # Validate production environment
-    if settings.ENVIRONMENT == "prod" and settings.CIRCLE_API_KEY:
+    if settings.ENVIRONMENT == "prod":
         from omniclaw.onboarding import load_managed_entity_secret
 
         api_key = settings.CIRCLE_API_KEY.get_secret_value() if settings.CIRCLE_API_KEY else None
@@ -66,12 +54,24 @@ async def on_startup() -> None:
     await OmniclawPaymentClient.get_instance()
     logger.info("mcp_startup_ready")
 
+    try:
+        yield
+    finally:
+        # Shutdown: Clean up your resources here
+        await OmniclawPaymentClient.close_instance()
+        logger.info("mcp_shutdown_complete")
 
-@mcp.on_shutdown()
-async def on_shutdown() -> None:
-    """Close the Omniclaw client on shutdown."""
-    await OmniclawPaymentClient.close_instance()
-    logger.info("mcp_shutdown_complete")
+
+mcp = FastMCP(
+    name="OmniClaw MCP Server",
+    instructions=(
+        "Production MCP server for Omniclaw SDK agent operations: "
+        "wallet management, guarded payments, payment intents, "
+        "transaction sync, and trust checks."
+    ),
+    auth=get_auth_provider() if settings.MCP_REQUIRE_AUTH else None,
+    lifespan=mcp_lifespan,
+)
 
 
 async def _client() -> OmniclawPaymentClient:
