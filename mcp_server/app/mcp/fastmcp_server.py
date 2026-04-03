@@ -43,6 +43,37 @@ mcp = FastMCP(
 )
 
 
+@mcp.on_startup()
+async def on_startup() -> None:
+    """Initialize the Omniclaw client on startup."""
+    logger.info(
+        "mcp_startup_init",
+        env=settings.ENVIRONMENT,
+        project=settings.PROJECT_NAME,
+        network=settings.OMNICLAW_NETWORK,
+    )
+
+    # Validate production environment
+    if settings.ENVIRONMENT == "prod" and settings.CIRCLE_API_KEY:
+        from omniclaw.onboarding import load_managed_entity_secret
+
+        api_key = settings.CIRCLE_API_KEY.get_secret_value() if settings.CIRCLE_API_KEY else None
+        managed_secret = load_managed_entity_secret(api_key) if api_key else None
+        if not settings.ENTITY_SECRET and not managed_secret:
+            raise RuntimeError("Missing ENTITY_SECRET in production")
+
+    # Warm up client singleton
+    await OmniclawPaymentClient.get_instance()
+    logger.info("mcp_startup_ready")
+
+
+@mcp.on_shutdown()
+async def on_shutdown() -> None:
+    """Close the Omniclaw client on shutdown."""
+    await OmniclawPaymentClient.close_instance()
+    logger.info("mcp_shutdown_complete")
+
+
 async def _client() -> OmniclawPaymentClient:
     return await OmniclawPaymentClient.get_instance()
 

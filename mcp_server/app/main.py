@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.lifecycle import shutdown_event, startup_event
 from app.core.logging import setup_logging
 from app.mcp.fastmcp_server import mcp
 from app.webhooks.circle import router as circle_webhook_router
@@ -16,26 +15,8 @@ from app.webhooks.circle import router as circle_webhook_router
 setup_logging()
 logger = structlog.get_logger(__name__)
 
-# Create FastMCP app first to get its lifespan
-mcp_app = mcp.http_app(path="/", stateless_http=True)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Start FastMCP lifespan (it's a function that returns async context manager)
-    async with mcp_app.lifespan(app):
-        # Start our custom startup
-        await startup_event(app)
-        yield
-        # Shutdown our custom logic
-        await shutdown_event(app)
-
-
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    lifespan=lifespan,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-)
+# Create unified FastMCP app (which is a FastAPI app under the hood)
+app = mcp.http_app(path="/", stateless_http=True)
 
 
 # Middleware for Correlation ID and Request Logging
@@ -81,11 +62,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# Mount FastMCP server at /mcp endpoint (stateless mode for horizontal scaling)
-# Note: path="/" because FastAPI mount strips the /mcp prefix
-app.mount("/mcp", mcp_app)
-
-# Include webhook router
+# Include webhook router directly on the unified app
 app.include_router(
     circle_webhook_router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["webhooks"]
 )
