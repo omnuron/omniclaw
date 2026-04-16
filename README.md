@@ -348,7 +348,9 @@ This is why OmniClaw is not just a thin wallet wrapper. The payment call is a co
 | [API Reference](docs/API_REFERENCE.md) | Python SDK and API details |
 | [ERC-8004 Trust Notes](docs/erc_804_spec.md) | Trust-layer notes and registry framing |
 
-[Star history](https://star-history.com/#omnuron/omniclaw&Date)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=omnuron/omniclaw&type=date)](https://star-history.com/#omnuron/omniclaw&Date)
 
 ## Development
 
