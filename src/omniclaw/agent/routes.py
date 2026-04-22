@@ -92,11 +92,22 @@ async def _choose_x402_route(
                 gateway_available_balance = balance.formatted_available
                 required_atomic = int(selected_gateway_kind.amount_atomic)
                 gateway_ready = balance.available >= required_atomic
-                gateway_reason = (
-                    "Gateway balance is sufficient for GatewayWalletBatched"
-                    if gateway_ready
-                    else "Gateway balance is below the required amount"
-                )
+                if gateway_ready:
+                    gateway_reason = "Gateway balance is sufficient for GatewayWalletBatched"
+                else:
+                    # Fallback to direct on-chain balance when API-reported balance is stale/lagging.
+                    try:
+                        onchain_balance = await client.get_gateway_onchain_balance(wallet_id)
+                        if onchain_balance.available >= required_atomic:
+                            gateway_available_balance = onchain_balance.formatted_available
+                            gateway_ready = True
+                            gateway_reason = (
+                                "Gateway on-chain balance is sufficient (API balance appears stale)"
+                            )
+                        else:
+                            gateway_reason = "Gateway balance is below the required amount"
+                    except Exception:
+                        gateway_reason = "Gateway balance is below the required amount"
             except Exception as exc:
                 gateway_ready = False
                 gateway_reason = f"Gateway balance check failed: {exc}"

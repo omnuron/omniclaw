@@ -346,6 +346,12 @@ async def test_choose_x402_route_prefers_exact_when_gateway_is_unfunded():
                 formatted_available="0.00",
             )
         ),
+        get_gateway_onchain_balance=AsyncMock(
+            return_value=SimpleNamespace(
+                available=0,
+                formatted_available="0.00",
+            )
+        ),
     )
     x402_adapter = SimpleNamespace(
         _resolve_agent_network=lambda wallet_id, destination_chain: "eip155:84532"
@@ -385,6 +391,12 @@ async def test_choose_x402_route_keeps_gateway_when_it_is_the_only_option():
                 formatted_available="0.00",
             )
         ),
+        get_gateway_onchain_balance=AsyncMock(
+            return_value=SimpleNamespace(
+                available=0,
+                formatted_available="0.00",
+            )
+        ),
     )
     x402_adapter = SimpleNamespace(
         _resolve_agent_network=lambda wallet_id, destination_chain: "eip155:84532"
@@ -401,6 +413,52 @@ async def test_choose_x402_route_keeps_gateway_when_it_is_the_only_option():
     assert route["payment_source"] == "gateway_balance"
     assert route["selected_kind"] is gateway_kind
     assert route["gateway_ready"] is False
+
+
+@pytest.mark.asyncio
+async def test_choose_x402_route_uses_onchain_fallback_when_api_balance_is_stale():
+    gateway_kind = SimpleNamespace(
+        amount_atomic=250000,
+        is_gateway_batched=True,
+        get_amount_usdc=lambda: Decimal("0.25"),
+    )
+    requirements = SimpleNamespace(
+        select_preferred_kind=lambda *, prefer_gateway, source_network: (
+            gateway_kind if prefer_gateway else None
+        )
+    )
+    client = SimpleNamespace(
+        _nano_adapter=object(),
+        get_gateway_balance=AsyncMock(
+            return_value=SimpleNamespace(
+                available=0,
+                formatted_available="0.00",
+            )
+        ),
+        get_gateway_onchain_balance=AsyncMock(
+            return_value=SimpleNamespace(
+                available=300000,
+                formatted_available="0.30",
+            )
+        ),
+    )
+    x402_adapter = SimpleNamespace(
+        _resolve_agent_network=lambda wallet_id, destination_chain: "eip155:84532"
+    )
+
+    route = await _choose_x402_route(
+        client=client,
+        wallet_id="buyer-wallet",
+        x402_adapter=x402_adapter,
+        requirements=requirements,
+    )
+
+    assert route["selected_route"] == "nanopayment"
+    assert route["payment_source"] == "gateway_balance"
+    assert route["selected_kind"] is gateway_kind
+    assert route["gateway_ready"] is True
+    assert route["gateway_available_balance"] == "0.30"
+    assert route["gateway_reason"] == "Gateway on-chain balance is sufficient (API balance appears stale)"
 
 
 @pytest.mark.asyncio
