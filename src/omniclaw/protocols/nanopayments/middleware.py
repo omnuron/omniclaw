@@ -401,6 +401,10 @@ class GatewayMiddleware:
         try:
             decoded = base64.b64decode(header_value)
             data = json.loads(decoded)
+            if int(data.get("x402Version", X402_VERSION)) == X402_VERSION and not data.get(
+                "accepted"
+            ):
+                raise ValueError("Missing accepted requirements in PAYMENT-SIGNATURE payload")
             return PaymentPayload.from_dict(data)
         except Exception as exc:
             raise ValueError(f"Failed to parse PAYMENT-SIGNATURE: {exc}") from exc
@@ -488,6 +492,31 @@ class GatewayMiddleware:
                     },
                     headers={},
                 )
+            accepted = payload.accepted.to_dict() if payload.accepted else None
+            if not accepted:
+                raise PaymentRequiredHTTPError(
+                    status_code=402,
+                    detail={"error": "Missing accepted requirements in PAYMENT-SIGNATURE payload"},
+                    headers={},
+                )
+            if str(accepted.get("network", "")) != payload.network:
+                raise PaymentRequiredHTTPError(
+                    status_code=402,
+                    detail={"error": "Accepted requirements network does not match payload"},
+                    headers={},
+                )
+            if str(accepted.get("amount", "")) != expected_amount:
+                raise PaymentRequiredHTTPError(
+                    status_code=402,
+                    detail={"error": "Accepted requirements amount does not match price"},
+                    headers={},
+                )
+            if str(accepted.get("payTo", "")).lower() != self._seller_address.lower():
+                raise PaymentRequiredHTTPError(
+                    status_code=402,
+                    detail={"error": "Accepted requirements payTo does not match seller"},
+                    headers={},
+                )
             # Build requirements from payload
             from omniclaw.protocols.nanopayments.types import (
                 PaymentRequirementsExtra,
@@ -530,6 +559,12 @@ class GatewayMiddleware:
                     detail={"error": f"Missing contract addresses for network {payload.network}"},
                     headers={},
                 )
+            if str(accepted.get("asset", "")).lower() != usdc_address.lower():
+                raise PaymentRequiredHTTPError(
+                    status_code=402,
+                    detail={"error": "Accepted requirements asset does not match network"},
+                    headers={},
+                )
 
             if self._uses_gateway_batched_scheme():
                 if not verifying_contract:
@@ -537,6 +572,17 @@ class GatewayMiddleware:
                         status_code=502,
                         detail={
                             "error": f"Missing verifying contract for network {payload.network}"
+                        },
+                        headers={},
+                    )
+                accepted_extra = accepted.get("extra") or {}
+                if str(accepted_extra.get("verifyingContract", "")).lower() != (
+                    verifying_contract.lower()
+                ):
+                    raise PaymentRequiredHTTPError(
+                        status_code=402,
+                        detail={
+                            "error": "Accepted requirements verifying contract does not match network"
                         },
                         headers={},
                     )

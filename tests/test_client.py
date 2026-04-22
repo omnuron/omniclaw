@@ -4,8 +4,8 @@ Unit tests for OmniClaw Client (Multi-tenant).
 Tests the main SDK entry point with per-wallet/wallet-set guards.
 """
 
-import os
 import inspect
+import os
 import tempfile
 from decimal import Decimal
 from pathlib import Path

@@ -16,6 +16,8 @@ OMNICLAW_WEBHOOK_DEDUP_DB_PATH=/var/lib/omniclaw/webhook_dedup.sqlite3
 
 Startup fails fast if these are missing or if strict settlement is disabled.
 
+For non-production package usage, `OMNICLAW_STRICT_SETTLEMENT` defaults to `false` so compatible x402 resources can still unlock even when a seller omits or delays settlement response metadata. Production deployments must opt into strict settlement explicitly.
+
 ## Webhook Security Model
 
 - Signature verification is enforced when `OMNICLAW_WEBHOOK_VERIFICATION_KEY` is configured.

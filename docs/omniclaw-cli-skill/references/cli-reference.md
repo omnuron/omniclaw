@@ -17,7 +17,9 @@ python3 scripts/generate_cli_reference.py
 - use `balance-detail` when Gateway state matters
 - use `--idempotency-key` for job-based payments
 - for x402 URLs, `--amount` can be omitted because the payment requirements come from the seller endpoint
+- `serve` is for owner-approved agent-run seller endpoints only
 - `serve` binds to `0.0.0.0` even if the banner prints `localhost`
+- `serve --exec` runs a host command; do not invent the command or expose it outside an isolated runtime
 
 ## Example Flows
 
@@ -45,9 +47,11 @@ Seller exposing a paid endpoint:
 omniclaw-cli serve \
   --price 0.01 \
   --endpoint /api/data \
-  --exec "python app.py" \
+  --exec "python safe_readonly_service.py" \
   --port 8000
 ```
+
+Only run this after the owner explicitly asks for an agent-run seller endpoint and supplies or approves the `--exec` command.
 
 ## Live Help Output
 

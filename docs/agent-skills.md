@@ -149,11 +149,13 @@ Useful buyer commands:
 
 ### Expose a paid endpoint
 
+Only use this path when the owner explicitly wants an agent-run seller endpoint. Vendor and enterprise APIs should use the SDK seller middleware instead.
+
 ```bash
 omniclaw-cli serve \
   --price 0.01 \
   --endpoint /api/data \
-  --exec "python app.py" \
+  --exec "python safe_readonly_service.py" \
   --port 8000
 ```
 
@@ -169,6 +171,9 @@ Important implementation detail:
 
 - `serve` binds to `0.0.0.0`
 - the banner may print `localhost`, but the actual bind host is all interfaces
+- `--exec` runs the supplied host command after payment verification
+- do not invent the `--exec` command; run only a command supplied or approved by the owner
+- prefer an isolated container or private development network for `serve`
 
 Useful seller commands:
 

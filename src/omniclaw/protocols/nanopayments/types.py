@@ -382,6 +382,15 @@ class PaymentPayload:
     Required by Circle Gateway. Set this to identify the resource being accessed.
     """
 
+    accepted: PaymentRequirementsKind | dict[str, Any] | None = None
+    """
+    Selected x402 v2 payment requirement.
+
+    External sellers and facilitators validate this field from the raw retry
+    payload. It must identify the exact requirement selected from the seller's
+    PAYMENT-REQUIRED accepts array.
+    """
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for JSON serialization."""
         result: dict[str, Any] = {
@@ -392,6 +401,12 @@ class PaymentPayload:
         }
         if self.resource is not None:
             result["resource"] = self.resource.to_dict()
+        if self.accepted is not None:
+            result["accepted"] = (
+                self.accepted.to_dict()
+                if hasattr(self.accepted, "to_dict")
+                else dict(self.accepted)
+            )
         return result
 
     @classmethod
@@ -399,12 +414,15 @@ class PaymentPayload:
         """Create from dict parsed from JSON."""
         resource_data = data.get("resource")
         resource = ResourceInfo.from_dict(resource_data) if resource_data else None
+        accepted_data = data.get("accepted")
+        accepted = PaymentRequirementsKind.from_dict(accepted_data) if accepted_data else None
         return cls(
             x402_version=data.get("x402Version", 2),
             scheme=data.get("scheme", "exact"),
             network=data.get("network", ""),
             payload=PaymentPayloadInner.from_dict(data.get("payload", {})),
             resource=resource,
+            accepted=accepted,
         )
 
 

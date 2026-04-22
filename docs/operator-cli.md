@@ -24,10 +24,12 @@ Use `omniclaw-cli` when an agent is performing constrained financial actions:
 omniclaw-cli can-pay --recipient https://seller.example.com/compute
 omniclaw-cli inspect-x402 --recipient https://seller.example.com/compute
 omniclaw-cli pay --recipient https://seller.example.com/compute --idempotency-key job-123
-omniclaw-cli serve --price 0.01 --endpoint /api/data --exec "python app.py"
+omniclaw-cli serve --price 0.01 --endpoint /api/data --exec "python safe_readonly_service.py"
 ```
 
 `omniclaw-cli serve` is the agent-facing seller surface. Use it when an agent needs to expose a paid endpoint for other agents or automation. Vendor and enterprise APIs that live inside application code should use the Python SDK seller middleware (`client.sell(...)`) instead.
+
+`serve` binds to all interfaces and `--exec` runs the supplied host command. Treat it as an explicit owner-approved action, preferably in an isolated runtime.
 
 ## Responsibility Split
 

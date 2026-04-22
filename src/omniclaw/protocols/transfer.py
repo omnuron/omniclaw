@@ -155,7 +155,7 @@ class TransferAdapter(ProtocolAdapter):
                 error=transfer_result.error,
             )
 
-        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", True))
+        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", False))
         tx = transfer_result.transaction
         status = PaymentStatus.PENDING_SETTLEMENT if strict_settlement else PaymentStatus.PROCESSING
         if tx:

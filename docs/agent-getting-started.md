@@ -212,11 +212,13 @@ If an agent wants to temporarily sell access to a local Python script or data fi
 omniclaw-cli serve \
   --price 0.01 \
   --endpoint /api/data \
-  --exec "python my_service.py" \
+  --exec "python safe_readonly_service.py" \
   --port 8000
 ```
 
-This opens `http://localhost:8000/api/data` that requires a USDC payment to execute `my_service.py` and return its output.
+This opens `http://localhost:8000/api/data` that requires a USDC payment to execute the approved command and return its output.
+
+`serve` binds to all interfaces and `--exec` runs a host command. Use it only when the owner explicitly wants an agent-run seller endpoint, and prefer an isolated container or private development network.
 
 > **Web developer or vendor:** If the paid route lives inside your application, use the Python SDK inside your FastAPI application instead of `omniclaw-cli serve`. Use `serve` when the seller surface itself is agent-run. See the [Developer Guide](developer-guide.md).
 
@@ -235,7 +237,7 @@ This opens `http://localhost:8000/api/data` that requires a USDC payment to exec
 | `omniclaw-cli inspect-x402 --recipient URL` | Inspect seller requirements and buyer readiness |
 | `omniclaw-cli pay --recipient 0x... --amount X` | Pay another agent |
 | `omniclaw-cli pay --recipient URL` | Pay a seller x402 endpoint |
-| `omniclaw-cli serve --price X --endpoint /api --exec "cmd"` | Start payment gate |
+| `omniclaw-cli serve --price X --endpoint /api --exec "cmd"` | Start an owner-approved agent-run payment gate |
 
 ---
 

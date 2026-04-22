@@ -91,7 +91,7 @@ class Config:
     nanopayments_private_key: str | None = None
     """Raw EOA private key for direct nanopayment signing (no vault needed)."""
 
-    payment_strict_settlement: bool = True
+    payment_strict_settlement: bool = False
     """If true, success=True is emitted only for irreversible settlement."""
 
     auto_reconcile_pending_settlements: bool = False
@@ -190,7 +190,7 @@ class Config:
         payment_strict_settlement = (
             overrides.get("payment_strict_settlement")
             if "payment_strict_settlement" in overrides
-            else (str(_get_env_var("OMNICLAW_STRICT_SETTLEMENT", "true")).lower() == "true")
+            else (str(_get_env_var("OMNICLAW_STRICT_SETTLEMENT", "false")).lower() == "true")
         )
         auto_reconcile_pending_settlements = (
             overrides.get("auto_reconcile_pending_settlements")
