@@ -76,9 +76,7 @@ def _accepted_requirements_match(
 ) -> tuple[bool, str]:
     """Validate x402 v2 payload.accepted against the server-selected requirement."""
     payload_accepted = payment_payload.get("accepted")
-    if int(payment_payload.get("x402Version", 2)) == 2 and not isinstance(
-        payload_accepted, dict
-    ):
+    if int(payment_payload.get("x402Version", 2)) == 2 and not isinstance(payload_accepted, dict):
         return False, "Missing accepted requirements in PAYMENT-SIGNATURE payload"
     if not isinstance(payload_accepted, dict):
         return True, ""
@@ -994,13 +992,15 @@ class Seller:
                 continue
             if payload_network and payload_network != str(accepted.get("network", "")):
                 continue
-            if str(payload_accepted.get("asset", accepted.get("asset", ""))).lower() != str(
-                accepted.get("asset", "")
-            ).lower():
+            if (
+                str(payload_accepted.get("asset", accepted.get("asset", ""))).lower()
+                != str(accepted.get("asset", "")).lower()
+            ):
                 continue
-            if str(payload_accepted.get("payTo", accepted.get("payTo", ""))).lower() != str(
-                accepted.get("payTo", "")
-            ).lower():
+            if (
+                str(payload_accepted.get("payTo", accepted.get("payTo", ""))).lower()
+                != str(accepted.get("payTo", "")).lower()
+            ):
                 continue
             accepted_amount = str(accepted.get("amount", "0"))
             if str(payload_accepted.get("amount", accepted_amount)) != accepted_amount:
