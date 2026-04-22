@@ -80,7 +80,7 @@ class GatewayAdapter(ProtocolAdapter):
         """Execute a cross-chain transfer."""
 
         source_network = source_network or self._config.network
-        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", True))
+        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", False))
         canonical_idempotency_key = idempotency_key or derive_idempotency_key(
             "gateway",
             wallet_id,

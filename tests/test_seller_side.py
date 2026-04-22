@@ -22,6 +22,15 @@ import pytest
 
 from omniclaw.seller import PaymentScheme, Seller, create_seller
 
+
+def _with_accepted(payload: dict, accepted: dict) -> dict:
+    """Attach required x402 v2 selected requirements to a test payment payload."""
+    payload["x402Version"] = 2
+    payload["accepted"] = accepted
+    payload.setdefault("network", accepted.get("network"))
+    return payload
+
+
 # =============================================================================
 # TEST PRICE PARSING (Decimal precision — critical fix)
 # =============================================================================
@@ -262,7 +271,8 @@ class TestSellerSecurityHardening:
         seller.add_endpoint("/test", "$0.001")
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
-        payload = {
+        payload = _with_accepted(
+            {
             "scheme": "exact",
             "network": accepted["network"],
             "payload": {
@@ -276,7 +286,9 @@ class TestSellerSecurityHardening:
                 },
                 "signature": "",
             },
-        }
+            },
+            accepted,
+        )
 
         is_valid, _, record = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid is True
@@ -285,6 +297,39 @@ class TestSellerSecurityHardening:
         is_valid_2, err_2, _ = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid_2 is False
         assert "nonce" in err_2.lower()
+
+    def test_v2_payment_without_accepted_is_rejected(self):
+        import time
+
+        seller = Seller(
+            seller_address="0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
+            name="Test",
+        )
+        seller.add_endpoint("/test", "$0.001")
+        accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
+
+        payload = {
+            "x402Version": 2,
+            "scheme": "exact",
+            "network": accepted["network"],
+            "payload": {
+                "authorization": {
+                    "from": "0xAAAA1111BBBB2222CCCC3333DDDD4444EEEE5555",
+                    "to": "0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
+                    "value": "1000",
+                    "validAfter": "0",
+                    "validBefore": str(int(time.time()) + 300),
+                    "nonce": "0x" + "22" * 32,
+                },
+                "signature": "",
+            },
+        }
+
+        is_valid, error, record = seller.verify_payment(payload, accepted, verify_signature=False)
+
+        assert is_valid is False
+        assert record is None
+        assert "Missing accepted requirements" in error
 
     def test_strict_gateway_contract_mode_rejects_missing_contract(self, monkeypatch):
         monkeypatch.setenv("OMNICLAW_SELLER_STRICT_GATEWAY_CONTRACT", "true")
@@ -354,7 +399,8 @@ class TestPaymentVerification:
         endpoints = seller.get_endpoints()
         accepted = seller._create_accepts(endpoints["/test"])[0]
 
-        payload = {
+        payload = _with_accepted(
+            {
             "scheme": "exact",
             "payload": {
                 "authorization": {
@@ -367,7 +413,9 @@ class TestPaymentVerification:
                 },
                 "signature": "",
             },
-        }
+            },
+            accepted,
+        )
 
         is_valid, error, record = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid is False
@@ -384,7 +432,8 @@ class TestPaymentVerification:
         seller.add_endpoint("/test", "$0.001")
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
-        payload = {
+        payload = _with_accepted(
+            {
             "scheme": "exact",
             "payload": {
                 "authorization": {
@@ -397,7 +446,9 @@ class TestPaymentVerification:
                 },
                 "signature": "",
             },
-        }
+            },
+            accepted,
+        )
 
         is_valid, error, record = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid is False
@@ -414,7 +465,8 @@ class TestPaymentVerification:
         seller.add_endpoint("/test", "$0.001")
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
-        payload = {
+        payload = _with_accepted(
+            {
             "scheme": "exact",
             "payload": {
                 "authorization": {
@@ -427,7 +479,9 @@ class TestPaymentVerification:
                 },
                 "signature": "",
             },
-        }
+            },
+            accepted,
+        )
 
         is_valid, error, record = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid is False
@@ -444,7 +498,8 @@ class TestPaymentVerification:
         seller.add_endpoint("/test", "$0.001")
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
-        payload = {
+        payload = _with_accepted(
+            {
             "scheme": "exact",
             "payload": {
                 "authorization": {
@@ -457,7 +512,9 @@ class TestPaymentVerification:
                 },
                 "signature": "",
             },
-        }
+            },
+            accepted,
+        )
 
         is_valid, error, record = seller.verify_payment(payload, accepted, verify_signature=False)
         assert is_valid is True
@@ -492,7 +549,7 @@ class TestFacilitatorIntegration:
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
         is_valid, error, record = await seller.verify_payment_async(
-            {"scheme": "exact", "payload": {}},
+            _with_accepted({"scheme": "exact", "payload": {}}, accepted),
             accepted,
         )
 
@@ -518,7 +575,7 @@ class TestFacilitatorIntegration:
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
         is_valid, error, record = await seller.verify_payment_async(
-            {"scheme": "exact", "payload": {}},
+            _with_accepted({"scheme": "exact", "payload": {}}, accepted),
             accepted,
             settle_payment=True,
         )
@@ -545,7 +602,7 @@ class TestFacilitatorIntegration:
         accepted = seller._create_accepts(seller.get_endpoints()["/test"])[0]
 
         is_valid, error, record = await seller.verify_payment_async(
-            {"scheme": "exact", "payload": {}},
+            _with_accepted({"scheme": "exact", "payload": {}}, accepted),
             accepted,
         )
 

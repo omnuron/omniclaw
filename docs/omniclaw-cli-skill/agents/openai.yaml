@@ -1,0 +1,6 @@
+interface:
+  display_name: "OmniClaw CLI"
+  short_description: "Policy-controlled agent payments through omniclaw-cli."
+  default_prompt: "Use $omniclaw to inspect balances, check policy, or pay an x402 URL through the OmniClaw CLI."
+policy:
+  allow_implicit_invocation: false

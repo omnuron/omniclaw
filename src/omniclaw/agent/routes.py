@@ -46,7 +46,10 @@ router = APIRouter(prefix="/api/v1", tags=["agent"])
 
 def _fmt_amount(value: object) -> str:
     try:
-        return f"{Decimal(str(value)).quantize(Decimal('0.01'))}"
+        amount = Decimal(str(value))
+        if amount.copy_abs() < Decimal("0.01") and amount != 0:
+            return f"{amount.quantize(Decimal('0.000001'))}".rstrip("0").rstrip(".")
+        return f"{amount.quantize(Decimal('0.01'))}"
     except Exception:
         return str(value)
 
@@ -1333,6 +1336,11 @@ async def x402_verify(
             return {"valid": False, "error": "Nanopayment client not initialized"}
 
         sig_data = json.loads(base64.b64decode(request.signature))
+        if int(sig_data.get("x402Version", 2)) == 2 and not sig_data.get("accepted"):
+            return {
+                "valid": False,
+                "error": "Missing accepted requirements in PAYMENT-SIGNATURE payload",
+            }
 
         from omniclaw.protocols.nanopayments.middleware import GatewayMiddleware
         from omniclaw.protocols.nanopayments.types import PaymentPayload, PaymentRequirements

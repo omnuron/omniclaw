@@ -22,6 +22,7 @@ class TestConfig:
         assert config.circle_api_key == "test_api_key_123"
         assert config.entity_secret == "test_entity_secret_456"
         assert config.network == Network.ETH  # default
+        assert config.payment_strict_settlement is False
 
     def test_create_config_with_all_options(self) -> None:
         """Test creating config with all options."""
@@ -84,6 +85,17 @@ class TestConfig:
         assert config.default_wallet_id == "wallet-xyz"
         assert config.payment_strict_settlement is True
         assert config.auto_reconcile_pending_settlements is True
+
+    def test_strict_settlement_defaults_to_false_for_non_production(self) -> None:
+        env_vars = {
+            "CIRCLE_API_KEY": "env_api_key",
+            "ENTITY_SECRET": "env_entity_secret",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.payment_strict_settlement is False
 
     def test_from_env_missing_api_key_raises(self) -> None:
         """Test from_env raises when API key not set."""

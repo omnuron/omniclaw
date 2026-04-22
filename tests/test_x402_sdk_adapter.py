@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -76,6 +78,12 @@ async def test_execute_uses_sdk_payment_signature_and_settle_response():
             )
 
         assert request.headers["PAYMENT-SIGNATURE"]
+        payment_payload = json.loads(base64.b64decode(request.headers["PAYMENT-SIGNATURE"]))
+        assert payment_payload["x402Version"] == 2
+        assert payment_payload["accepted"]["scheme"] == "exact"
+        assert payment_payload["accepted"]["network"] == "eip155:84532"
+        assert payment_payload["accepted"]["amount"] == "250000"
+        assert payment_payload["accepted"]["payTo"] == "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
         return httpx.Response(
             200,
             headers={"PAYMENT-RESPONSE": _make_payment_response_header(success=True)},
@@ -103,6 +111,55 @@ async def test_execute_uses_sdk_payment_signature_and_settle_response():
     assert calls[0].headers["x-trace-id"] == "abc123"
     assert calls[1].headers["x-trace-id"] == "abc123"
     assert calls[1].method == "POST"
+
+
+def test_ensure_v2_payload_has_accepted_patches_missing_sdk_field():
+    from x402.schemas import PaymentRequired, PaymentRequirements, ResourceInfo
+
+    selected = PaymentRequirements(
+        scheme="exact",
+        network="eip155:84532",
+        asset="0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        amount="250000",
+        pay_to="0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        max_timeout_seconds=300,
+        extra={"name": "USD Coin", "version": "2"},
+    )
+    payment_required = PaymentRequired(
+        error="Payment Required",
+        resource=ResourceInfo(
+            url="https://seller.example/compute",
+            description="paid resource",
+            mime_type="application/json",
+        ),
+        accepts=[selected],
+    )
+    incomplete_payload = SimpleNamespace(
+        x402_version=2,
+        payload={
+            "authorization": {
+                "from": "0xCa7fc646D249442404e43e9ce3B9015241ABcCEE",
+                "to": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+                "value": "250000",
+                "validAfter": "1776868697",
+                "validBefore": "1776869597",
+                "nonce": "0x1cd5a89daa51bb8b7f113f02dd5a7c4b833e5a17e5b653d41e09eef8c1189524",
+            },
+            "signature": "0xsignature",
+        },
+    )
+
+    patched = X402Adapter._ensure_v2_payload_has_accepted(
+        payment_payload=incomplete_payload,
+        selected_requirements=selected,
+        payment_required=payment_required,
+    )
+
+    dumped = patched.model_dump(by_alias=True)
+    assert dumped["accepted"]["scheme"] == "exact"
+    assert dumped["accepted"]["network"] == "eip155:84532"
+    assert dumped["accepted"]["amount"] == "250000"
+    assert dumped["resource"]["url"] == "https://seller.example/compute"
 
 
 @pytest.mark.asyncio

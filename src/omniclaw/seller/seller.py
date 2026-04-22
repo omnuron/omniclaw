@@ -70,6 +70,49 @@ def _usd_to_atomic(price_usd: Decimal) -> int:
     return int(atomic)
 
 
+def _accepted_requirements_match(
+    payment_payload: dict[str, Any],
+    accepted: dict[str, Any],
+) -> tuple[bool, str]:
+    """Validate x402 v2 payload.accepted against the server-selected requirement."""
+    payload_accepted = payment_payload.get("accepted")
+    if int(payment_payload.get("x402Version", 2)) == 2 and not isinstance(
+        payload_accepted, dict
+    ):
+        return False, "Missing accepted requirements in PAYMENT-SIGNATURE payload"
+    if not isinstance(payload_accepted, dict):
+        return True, ""
+
+    checks = (
+        ("scheme", False, False),
+        ("network", False, False),
+        ("asset", True, True),
+        ("amount", False, False),
+        ("payTo", True, True),
+    )
+    for requirement_field, casefold, optional in checks:
+        expected = accepted.get(requirement_field)
+        actual = payload_accepted.get(requirement_field)
+        if optional and (expected is None or actual is None):
+            continue
+        expected_text = str(expected)
+        actual_text = str(actual)
+        if casefold:
+            expected_text = expected_text.lower()
+            actual_text = actual_text.lower()
+        if actual_text != expected_text:
+            return False, f"Accepted requirements mismatch: {requirement_field}"
+
+    expected_extra = accepted.get("extra") or {}
+    actual_extra = payload_accepted.get("extra") or {}
+    expected_contract = expected_extra.get("verifyingContract")
+    actual_contract = actual_extra.get("verifyingContract")
+    if expected_contract and str(actual_contract).lower() != str(expected_contract).lower():
+        return False, "Accepted requirements mismatch: verifyingContract"
+
+    return True, ""
+
+
 # =============================================================================
 # TYPES
 # =============================================================================
@@ -515,6 +558,10 @@ class Seller:
             authorization = payment_data.get("authorization", {})
             signature = payment_data.get("signature", "")
 
+            accepted_ok, accepted_error = _accepted_requirements_match(payment_payload, accepted)
+            if not accepted_ok:
+                return False, accepted_error, None
+
             # Use Circle Gateway facilitator if available
             if self._facilitator:
                 return self._verify_with_facilitator(
@@ -635,6 +682,10 @@ class Seller:
             payment_data = payment_payload.get("payload", {})
             authorization = payment_data.get("authorization", {})
             signature = payment_data.get("signature", "")
+
+            accepted_ok, accepted_error = _accepted_requirements_match(payment_payload, accepted)
+            if not accepted_ok:
+                return False, accepted_error, None
 
             # Use Circle Gateway facilitator if available
             if self._facilitator:
@@ -928,8 +979,12 @@ class Seller:
         if not accepts:
             return None
 
-        payload_network = str(payload.get("network", ""))
-        payload_scheme = str(payload.get("scheme", "exact")).lower()
+        payload_accepted = payload.get("accepted")
+        if int(payload.get("x402Version", 2)) == 2 and not isinstance(payload_accepted, dict):
+            return None
+        payload_accepted = payload_accepted or {}
+        payload_network = str(payload_accepted.get("network", payload.get("network", "")))
+        payload_scheme = str(payload_accepted.get("scheme", payload.get("scheme", "exact"))).lower()
         payload_data = payload.get("payload", {}) or {}
         auth = payload_data.get("authorization", {}) or {}
         payload_value = str(auth.get("value", ""))
@@ -939,7 +994,17 @@ class Seller:
                 continue
             if payload_network and payload_network != str(accepted.get("network", "")):
                 continue
+            if str(payload_accepted.get("asset", accepted.get("asset", ""))).lower() != str(
+                accepted.get("asset", "")
+            ).lower():
+                continue
+            if str(payload_accepted.get("payTo", accepted.get("payTo", ""))).lower() != str(
+                accepted.get("payTo", "")
+            ).lower():
+                continue
             accepted_amount = str(accepted.get("amount", "0"))
+            if str(payload_accepted.get("amount", accepted_amount)) != accepted_amount:
+                continue
             if payload_value and int(payload_value) < int(accepted_amount):
                 continue
             return accepted

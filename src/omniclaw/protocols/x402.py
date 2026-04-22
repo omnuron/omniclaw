@@ -7,6 +7,7 @@ import ipaddress
 import json
 import os
 import re
+from contextlib import suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -544,6 +545,80 @@ class X402Adapter(ProtocolAdapter):
         x402_client.on_after_payment_creation(_capture_selection)
         return x402HTTPClient(x402_client), selection_state
 
+    @staticmethod
+    def _payload_has_accepted(payment_payload: Any) -> bool:
+        accepted = getattr(payment_payload, "accepted", None)
+        if accepted is not None:
+            return True
+        if hasattr(payment_payload, "model_dump"):
+            try:
+                dumped = payment_payload.model_dump(by_alias=True, exclude_none=True)
+                return bool(dumped.get("accepted"))
+            except Exception:
+                return False
+        return False
+
+    @classmethod
+    def _ensure_v2_payload_has_accepted(
+        cls,
+        *,
+        payment_payload: Any,
+        selected_requirements: Any,
+        payment_required: Any,
+    ) -> Any:
+        """
+        Ensure x402 v2 retry payloads include the selected `accepted` requirement.
+
+        x402 v2 makes PaymentPayload.accepted required. Some SDK/client
+        combinations have returned a signed payload object without that field,
+        which causes strict sellers to reject the retry request before
+        settlement.
+        """
+        if getattr(payment_payload, "x402_version", 2) != 2:
+            return payment_payload
+        if cls._payload_has_accepted(payment_payload):
+            return payment_payload
+
+        try:
+            from x402.schemas import PaymentPayload as X402PaymentPayload
+
+            payload_data: dict[str, Any]
+            if hasattr(payment_payload, "model_dump"):
+                payload_data = payment_payload.model_dump(by_alias=True, exclude_none=True)
+            else:
+                payload_data = dict(getattr(payment_payload, "__dict__", {}))
+
+            payload_data["accepted"] = selected_requirements
+            if not payload_data.get("resource"):
+                resource = getattr(payment_required, "resource", None)
+                if resource is not None:
+                    payload_data["resource"] = resource
+
+            return X402PaymentPayload.model_validate(payload_data)
+        except Exception:
+            with suppress(Exception):
+                payment_payload.accepted = selected_requirements
+            return payment_payload
+
+    @staticmethod
+    def _selected_requirements_from_payload_or_response(
+        *,
+        payment_payload: Any,
+        payment_required: Any,
+        selection_state: dict[str, Any],
+    ) -> Any:
+        selected_requirements = selection_state.get("requirements") or getattr(
+            payment_payload, "accepted", None
+        )
+        if selected_requirements is not None:
+            return selected_requirements
+
+        accepts = getattr(payment_required, "accepts", None)
+        if accepts:
+            return accepts[0]
+
+        raise ProtocolError("x402 payment payload did not include accepted requirements")
+
     def _resolve_exact_balance_rpc_url(self, selected_network: Network | None) -> str | None:
         config_rpc_url = getattr(self._config, "rpc_url", None)
         config_network = _resolve_network(str(getattr(self._config, "network", "") or ""))
@@ -653,7 +728,7 @@ class X402Adapter(ProtocolAdapter):
     ) -> PaymentResult:
         """Execute an x402 exact payment using the upstream x402 SDK."""
         url = recipient
-        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", True))
+        strict_settlement = bool(getattr(self._config, "payment_strict_settlement", False))
         request_method = str(kwargs.get("http_method", kwargs.get("method", "GET"))).upper()
         request_headers = kwargs.get("request_headers") or kwargs.get("headers")
         request_json = kwargs.get("request_json")
@@ -704,7 +779,16 @@ class X402Adapter(ProtocolAdapter):
                 agent_caip2,
             )
             payment_payload = await x402_http_client.create_payment_payload(payment_required)
-            selected_requirements = selection_state.get("requirements") or payment_payload.accepted
+            selected_requirements = self._selected_requirements_from_payload_or_response(
+                payment_payload=payment_payload,
+                payment_required=payment_required,
+                selection_state=selection_state,
+            )
+            payment_payload = self._ensure_v2_payload_has_accepted(
+                payment_payload=payment_payload,
+                selected_requirements=selected_requirements,
+                payment_required=payment_required,
+            )
             required_amount = self._atomic_to_decimal(str(selected_requirements.amount))
             payment_address = str(selected_requirements.pay_to)
 
@@ -877,7 +961,11 @@ class X402Adapter(ProtocolAdapter):
             )
             payment_required = x402_http_client.get_payment_required_response(get_header, body_data)
             payment_payload = await x402_http_client.create_payment_payload(payment_required)
-            selected_requirements = selection_state.get("requirements") or payment_payload.accepted
+            selected_requirements = self._selected_requirements_from_payload_or_response(
+                payment_payload=payment_payload,
+                payment_required=payment_required,
+                selection_state=selection_state,
+            )
 
             required_amount = self._atomic_to_decimal(str(selected_requirements.amount))
             result["would_succeed"] = True

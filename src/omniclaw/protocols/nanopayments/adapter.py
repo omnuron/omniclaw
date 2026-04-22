@@ -229,7 +229,7 @@ class NanopaymentAdapter:
         circuit_breaker: NanopaymentCircuitBreaker | None = None,
         retry_attempts: int = 3,
         retry_base_delay: float = 0.5,
-        strict_settlement: bool = True,
+        strict_settlement: bool = False,
     ) -> None:
         self._signer = signer
         self._network = network
@@ -321,6 +321,23 @@ class NanopaymentAdapter:
                 resource=resource,
             )
         return payload
+
+    @staticmethod
+    def _encode_payment_signature_header(
+        payload: PaymentPayload,
+        accepted: PaymentRequirementsKind,
+    ) -> str:
+        """
+        Encode the x402 v2 payment header sent back to the seller.
+
+        x402 v2 requires the retry payload to include the selected `accepted`
+        requirement. Circle settlement also receives this requirement separately,
+        but external sellers validate the raw PAYMENT-SIGNATURE header before
+        accepting the paid retry.
+        """
+        payment_payload = payload.to_dict()
+        payment_payload["accepted"] = accepted.to_dict()
+        return base64.b64encode(json.dumps(payment_payload).encode("utf-8")).decode("ascii")
 
     # -------------------------------------------------------------------------
     # x402 URL payment
@@ -508,9 +525,10 @@ class NanopaymentAdapter:
         )
 
         # Step 8: Retry with payment header
-        payment_sig_header = base64.b64encode(
-            json.dumps(payload.to_dict()).encode("utf-8"),
-        ).decode("ascii")
+        payment_sig_header = self._encode_payment_signature_header(
+            payload=payload,
+            accepted=updated_kind,
+        )
 
         retry_headers = dict(headers)
         retry_headers["PAYMENT-SIGNATURE"] = payment_sig_header
@@ -1008,7 +1026,7 @@ class NanopaymentProtocolAdapter:
         Returns:
             PaymentResult with nanopayment details.
         """
-        strict_settlement = bool(getattr(self._adapter, "_strict_settlement", True))
+        strict_settlement = bool(getattr(self._adapter, "_strict_settlement", False))
         try:
             if _is_url(recipient):
                 result = await self._adapter.pay_x402_url(

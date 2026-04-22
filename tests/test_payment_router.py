@@ -235,10 +235,19 @@ class TestTransferAdapterExecute:
 
     async def test_execute_pending_transfer_reports_pending_settlement(
         self,
-        transfer_adapter: TransferAdapter,
+        mock_config: Config,
         mock_wallet_service: MagicMock,
     ) -> None:
         """Non-final provider state should be in-flight, not irreversible success."""
+        transfer_adapter = TransferAdapter(
+            Config(
+                circle_api_key=mock_config.circle_api_key,
+                entity_secret=mock_config.entity_secret,
+                network=mock_config.network,
+                payment_strict_settlement=True,
+            ),
+            mock_wallet_service,
+        )
         mock_wallet_service.transfer.return_value = TransferResult(
             success=True,
             transaction=TransactionInfo(

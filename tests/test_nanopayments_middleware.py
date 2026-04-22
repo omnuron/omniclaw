@@ -19,6 +19,7 @@ from omniclaw.protocols.nanopayments import (
     MAX_TIMEOUT_SECONDS,
     X402_VERSION,
 )
+from omniclaw.protocols.nanopayments.adapter import NanopaymentAdapter
 from omniclaw.protocols.nanopayments.client import NanopaymentClient
 from omniclaw.protocols.nanopayments.exceptions import InvalidPriceError
 from omniclaw.protocols.nanopayments.middleware import (
@@ -30,6 +31,8 @@ from omniclaw.protocols.nanopayments.types import (
     EIP3009Authorization,
     PaymentPayload,
     PaymentPayloadInner,
+    PaymentRequirementsExtra,
+    PaymentRequirementsKind,
     SupportedKind,
 )
 
@@ -271,6 +274,49 @@ class TestGatewayMiddleware:
 
 
 class TestHandle:
+    def test_payment_signature_header_includes_accepted_requirements(self):
+        """Buyer retry header must include x402 v2 accepted requirements."""
+        authorization = EIP3009Authorization.create(
+            from_address="0x" + "a" * 40,
+            to="0x" + "b" * 40,
+            value="440",
+            valid_before=9999999999,
+            nonce="0x" + "c" * 64,
+        )
+        payload = PaymentPayload(
+            x402_version=2,
+            scheme="exact",
+            network="eip155:11155111",
+            payload=PaymentPayloadInner(
+                signature="0x" + "d" * 130,
+                authorization=authorization,
+            ),
+        )
+        accepted = PaymentRequirementsKind(
+            scheme="exact",
+            network="eip155:11155111",
+            asset="0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
+            amount="440",
+            max_timeout_seconds=345600,
+            pay_to="0x" + "b" * 40,
+            extra=PaymentRequirementsExtra(
+                name="GatewayWalletBatched",
+                version="1",
+                verifying_contract="0x" + "e" * 40,
+            ),
+        )
+
+        sig_header = NanopaymentAdapter._encode_payment_signature_header(payload, accepted)
+        decoded = json.loads(base64.b64decode(sig_header))
+
+        assert decoded["x402Version"] == 2
+        assert decoded["scheme"] == "exact"
+        assert decoded["network"] == "eip155:11155111"
+        assert decoded["accepted"]["scheme"] == "exact"
+        assert decoded["accepted"]["network"] == "eip155:11155111"
+        assert decoded["accepted"]["amount"] == "440"
+        assert decoded["accepted"]["extra"]["name"] == "GatewayWalletBatched"
+
     @pytest.mark.asyncio
     async def test_handle_without_payment_raises_402(self):
         """Request without PAYMENT-SIGNATURE header returns 402."""
@@ -313,6 +359,19 @@ class TestHandle:
                 signature="0x" + "c" * 130,
                 authorization=authorization,
             ),
+            accepted=PaymentRequirementsKind(
+                scheme="exact",
+                network="eip155:5042002",
+                asset="0xUsdcArcTestnet",
+                amount="1000",
+                max_timeout_seconds=345600,
+                pay_to="0x" + "a" * 40,
+                extra=PaymentRequirementsExtra(
+                    name="GatewayWalletBatched",
+                    version="1",
+                    verifying_contract="0x" + "c" * 40,
+                ),
+            ),
         )
 
         sig_header = base64.b64encode(json.dumps(payload.to_dict()).encode()).decode()
@@ -330,6 +389,38 @@ class TestHandle:
 
         assert info.verified is True
         assert info.transaction == "batch-123"
+
+    @pytest.mark.asyncio
+    async def test_handle_rejects_v2_payment_without_accepted(self):
+        """OmniClaw seller must reject malformed x402 v2 retry payloads."""
+        authorization = EIP3009Authorization.create(
+            from_address="0x" + "a" * 40,
+            to="0x" + "a" * 40,
+            value="1000",
+            valid_before=9999999999,
+            nonce="0x" + "b" * 64,
+        )
+        payload = PaymentPayload(
+            x402_version=2,
+            scheme="exact",
+            network="eip155:5042002",
+            payload=PaymentPayloadInner(
+                signature="0x" + "c" * 130,
+                authorization=authorization,
+            ),
+        )
+        sig_header = base64.b64encode(json.dumps(payload.to_dict()).encode()).decode()
+
+        middleware = GatewayMiddleware(
+            seller_address="0x" + "a" * 40,
+            nanopayment_client=_make_client(),
+            supported_kinds=_make_kinds(),
+        )
+
+        with pytest.raises(PaymentRequiredHTTPError) as exc_info:
+            await middleware.handle({"payment-signature": sig_header}, "$0.001")
+
+        assert "Missing accepted requirements" in exc_info.value.detail["error"]
 
     @pytest.mark.asyncio
     async def test_handle_with_invalid_signature_raises_402(self):
@@ -388,6 +479,19 @@ class TestHandle:
             payload=PaymentPayloadInner(
                 signature="0x" + "c" * 130,
                 authorization=authorization,
+            ),
+            accepted=PaymentRequirementsKind(
+                scheme="exact",
+                network="eip155:5042002",
+                asset="0xUsdcArcTestnet",
+                amount="1000",
+                max_timeout_seconds=345600,
+                pay_to="0x" + "a" * 40,
+                extra=PaymentRequirementsExtra(
+                    name="",
+                    version="",
+                    verifying_contract="",
+                ),
             ),
         )
         sig_header = base64.b64encode(json.dumps(payload.to_dict()).encode()).decode()

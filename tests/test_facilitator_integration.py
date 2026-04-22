@@ -103,6 +103,8 @@ class TestFacilitatorIntegration:
             "payTo": "0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
             "maxTimeoutSeconds": 345600,
         }
+        payment_payload["network"] = accepted["network"]
+        payment_payload["accepted"] = accepted
 
         is_valid, error, record = seller.verify_payment(
             payment_payload=payment_payload,
@@ -150,6 +152,8 @@ class TestFacilitatorIntegration:
             "payTo": "0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
             "maxTimeoutSeconds": 345600,
         }
+        payment_payload["network"] = accepted["network"]
+        payment_payload["accepted"] = accepted
 
         is_valid, error, record = seller.verify_payment(
             payment_payload=payment_payload,
@@ -200,6 +204,8 @@ class TestFacilitatorIntegration:
             "amount": "1000",
             "payTo": "0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
         }
+        payment_payload["network"] = accepted["network"]
+        payment_payload["accepted"] = accepted
 
         is_valid, error, record = seller.verify_payment(
             payment_payload=payment_payload,
@@ -250,6 +256,8 @@ class TestFacilitatorIntegration:
             "amount": "1000",
             "payTo": "0x742d35Cc6634C0532925a3b844Bc9e7595f1E123",
         }
+        payment_payload["network"] = accepted["network"]
+        payment_payload["accepted"] = accepted
 
         is_valid, error, record = seller.verify_payment(
             payment_payload=payment_payload,
