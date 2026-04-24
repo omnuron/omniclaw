@@ -754,7 +754,7 @@ class NanopaymentClient:
         """
         await self.get_supported()
 
-        _caip2_to_circle_domain_id(network)
+        expected_domain = _caip2_to_circle_domain_id(network)
         body: dict[str, Any] = {
             "token": "USDC",
             "sources": [
@@ -789,7 +789,19 @@ class NanopaymentClient:
         formatted_total = "0 USDC"
         formatted_available = "0 USDC"
         if balances:
-            bal = balances[0]
+            depositor_lc = address.lower()
+
+            # Circle may return multiple domains; never assume index 0 is the requested network.
+            by_depositor = [
+                b
+                for b in balances
+                if str(b.get("depositor", "")).lower() == depositor_lc or not b.get("depositor")
+            ]
+            by_domain = [
+                b for b in by_depositor if int(_to_int(b.get("domain", 0))) == expected_domain
+            ]
+            bal = by_domain[0] if by_domain else (by_depositor[0] if by_depositor else balances[0])
+
             # Circle returns "balance" field with string amount, no separate available field
             balance_str = bal.get("balance", "0")
             total = _to_int(balance_str)
