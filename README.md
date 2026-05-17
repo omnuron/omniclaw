@@ -374,3 +374,134 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md).
 ## License
 
 MIT. See [LICENSE](LICENSE).
+---
+
+## ❓ FAQ
+
+### What is OmniClaw?
+
+OmniClaw is the policy-controlled payment layer for agentic systems. It governs financial authority before payments execute, lets agents pay through approved rails, enables vendors to monetize routes, and supports self-hosted settlement infrastructure.
+
+### How does OmniClaw differ from traditional payment systems?
+
+| Feature | OmniClaw | Traditional Payments |
+|---------|----------|---------------------|
+| **Authority Model** | Policy-controlled | Raw key access |
+| **Agent Safety** | Pre-check before execution | Post-fraud detection |
+| **Rail Selection** | Circle Gateway + x402 exact | Single provider |
+| **Self-hosting** | Supported | Usually proprietary |
+| **Vendor Integration** | Built-in 402 flows | Custom implementation |
+
+### What is the Financial Policy Engine?
+
+The Financial Policy Engine enforces payment authority, limits, approvals, trust checks, and execution control before any funds move. It separates wallet authority from agent execution, preventing single hallucinations or prompt injections from draining funds.
+
+### What are the three adoption paths?
+
+1. **Autonomous Buyers**: Agents pay through policy, not raw wallet authority
+2. **Paid Vendors**: Monetize API routes with `client.sell(...)` and x402-compatible flows
+3. **Self-hosted Settlement**: Run your own exact facilitator on Arc, Base, Ethereum
+
+### What's the difference between Circle Gateway and x402 exact?
+
+| Feature | Circle Gateway | x402 Exact |
+|---------|---------------|------------|
+| **Gas** | Gasless nanopayments | Standard gas |
+| **Amount** | Microflows | Standard amounts |
+| **Speed** | Instant | Settlement time |
+| **Self-host** | No (Circle-managed) | Yes |
+
+### What networks are supported for self-hosted exact facilitator?
+
+- Arc Testnet
+- Base Sepolia
+- Ethereum Sepolia
+- Base Mainnet
+- Ethereum Mainnet
+
+Run with: `omniclaw facilitator exact`
+
+### What credentials does OmniClaw use?
+
+**Two key surfaces:**
+- `OMNICLAW_PRIVATE_KEY`: EOA key for x402 exact settlement and Circle Gateway signing
+- `ENTITY_SECRET`: Circle's developer-controlled wallet encryption secret (if using Circle)
+
+Circle allows one active Entity Secret per account. OmniClaw auto-generates if not provided.
+
+### How do I use the Buyer CLI?
+
+```bash
+# Set credentials
+export OMNICLAW_PRIVATE_KEY="0x..."
+export OMNICLAW_AGENT_TOKEN="agent-token"
+export OMNICLAW_AGENT_POLICY_PATH="./policy.json"
+export OMNICLAW_NETWORK="BASE-SEPOLIA"
+export OMNICLAW_RPC_URL="https://sepolia.base.org"
+
+# Start policy engine
+omniclaw server
+
+# Agent pays
+omniclaw-cli pay
+```
+
+### How do I use the Python SDK (Buyer)?
+
+```python
+from omniclaw import OmniClaw
+
+client = OmniClaw()
+client.pay(url="https://api.example.com/paid-endpoint", amount="0.01")
+```
+
+### How do I monetize as a Vendor?
+
+```python
+from omniclaw import OmniClaw
+
+client = OmniClaw()
+
+# Route returns 402 until paid
+@app.get("/paid-endpoint")
+@client.sell(amount="0.01")
+async def paid_endpoint():
+    return {"data": "premium content"}
+```
+
+### What are the proven results?
+
+- Arc Testnet exact settlement proof: [transaction link](https://testnet.arcscan.app/tx/0xd40dc800a54bee4ff80da4709e65cfd3d0346eb1995ebc34fba433a6306b9219)
+- 1st place at lablab.ai Agentic Commerce Hackathon on ARC
+- Top 11 finalist in C.R.I.S.P Agentic AI Ideation Challenge
+
+### Troubleshooting
+
+**Policy Engine won't start:**
+- Verify `OMNICLAW_PRIVATE_KEY` is valid hex (0x prefix)
+- Check `OMNICLAW_AGENT_POLICY_PATH` file exists
+- Ensure network and RPC URL are correct
+
+**Payment rejected:**
+- Check policy limits in `policy.json`
+- Verify agent token matches policy
+- Ensure sufficient balance for amount + gas
+
+**Self-hosted facilitator fails:**
+- Verify funded EOA key
+- Check RPC URL for correct network
+- Ensure contract addresses are up-to-date
+
+**Circle Gateway issues:**
+- Verify `CIRCLE_API_KEY` and `ENTITY_SECRET`
+- Check Circle account status
+- Ensure Entity Secret matches Circle account
+
+### Where can I get help?
+
+- **Quick Start**: Run `bash scripts/start_arc_marketplace_showcase_docker.sh`
+- **Examples**: See [examples/arc-marketplace-showcase/README.md](examples/arc-marketplace-showcase/README.md)
+- **Issues**: [GitHub Issues](https://github.com/omnuron/omniclaw/issues)
+- **Documentation**: This README and inline code comments
+
+---
