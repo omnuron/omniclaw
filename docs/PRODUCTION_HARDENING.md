@@ -15,7 +15,7 @@ OMNICLAW_WEBHOOK_DEDUP_DB_PATH=/var/lib/omniclaw/webhook_dedup.sqlite3
 
 Startup fails fast if these are missing or if strict settlement is disabled.
 
-For non-production package usage, `OMNICLAW_STRICT_SETTLEMENT` defaults to `false` so compatible x402 resources can still unlock even when a seller omits or delays settlement response metadata. Production deployments must opt into strict settlement explicitly.
+For non-production package usage, `OMNICLAW_STRICT_SETTLEMENT` defaults to `false` so compatible x402 resources can still unlock even when an endpoint omits or delays settlement response metadata. Production deployments must opt into strict settlement explicitly.
 
 ## Webhook Security Model
 
@@ -35,37 +35,24 @@ OMNICLAW_WEBHOOK_MAX_FUTURE_SKEW_SECONDS=300
 OMNICLAW_WEBHOOK_DEDUP_ENABLED=true
 ```
 
-## Product Boundary
-
-This document covers OmniClaw core. Seller project APIs, facilitator settlement, nonce replay protection for seller middleware, control-plane auth, and reconciliation are part of the standalone hosted facilitator service:
-
-```bash
-services/hosted-facilitator/
-```
-
 ## Settlement Semantics
 
 - `OMNICLAW_STRICT_SETTLEMENT=true` ensures success reflects irreversible settlement states.
 - Do not disable strict settlement in production.
 
-## External Facilitator Strategy
+## x402 Buyer Strategy
 
-OmniClaw core is facilitator-aware as a buyer. Production buyer deployments should inspect what the seller advertises and route only through a buyer-supported payment method:
+OmniClaw core is buyer-side infrastructure. Production buyer deployments should inspect what the paid endpoint advertises and route only through a buyer-supported payment method:
 
 - Circle Gateway `GatewayWalletBatched` for gasless batched nanopayments
-- standard x402 `exact` where the seller and facilitator advertise compatible requirements
-- external facilitator URLs selected by the seller
+- standard x402 `exact` where the endpoint advertises compatible requirements
 
-Operate OmniClaw-hosted settlement from `services/hosted-facilitator`, not from the core package.
-
-Before production traffic, validate the exact seller path with:
+Before production traffic, validate the exact paid endpoint path with:
 
 ```bash
-omniclaw-cli inspect-x402 --recipient https://seller.example.com/compute
-omniclaw-cli pay --recipient https://seller.example.com/compute --idempotency-key production-canary-001
+omniclaw-cli inspect-x402 --recipient https://paid.example.com/compute
+omniclaw-cli pay --recipient https://paid.example.com/compute --idempotency-key production-canary-001
 ```
-
-For hosted facilitator validation, use `services/hosted-facilitator/docs/` plus the external seller and buyer examples under root `examples/hosted_facilitator_*`.
 
 ## Canary and SLA
 
@@ -88,10 +75,10 @@ Exit behavior:
 ## Rollout Checklist
 
 1. Apply required production env vars.
-2. Run `omniclaw doctor`.
+2. Confirm the policy engine health endpoint and CLI configuration.
 3. Run canary in target environment.
-4. Confirm `inspect-x402` selects the expected seller scheme and network.
-5. Confirm settlement appears in the selected facilitator dashboard or explorer.
+4. Confirm `inspect-x402` selects the expected payment scheme and network.
+5. Confirm settlement appears in the expected explorer or provider record.
 6. Deploy with staged traffic.
 7. Monitor:
    - settlement latency

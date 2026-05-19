@@ -15,13 +15,3 @@ services:
       - ./policy.json:/config/policy.json
     ports:
       - "9080:8080"
-
-  seller:
-    build:
-      context: ../..
-      dockerfile: Dockerfile.agent
-    command: uv run python3 examples/agent/seller.py
-    environment:
-      - OMNICLAW_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-    ports:
-      - "9001:8001"

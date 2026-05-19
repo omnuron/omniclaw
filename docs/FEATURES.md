@@ -12,9 +12,9 @@ OmniClaw core is the buyer-side policy and payment-control layer.
 
 ## x402 Buyer Support
 
-- Inspect seller `PAYMENT-REQUIRED` responses
+- Inspect x402 `PAYMENT-REQUIRED` responses
 - Select supported x402 routes
-- Pay standard `exact` seller endpoints
+- Pay standard `exact` x402 endpoints
 - Use Circle Gateway `GatewayWalletBatched` when the buyer is funded and the route is advertised
 
 ## Circle Gateway Buyer Operations
@@ -23,11 +23,3 @@ OmniClaw core is the buyer-side policy and payment-control layer.
 - On-chain Gateway balance checks
 - Deposit and withdraw helpers
 - Buyer readiness for nanopayment routes
-
-## Standalone Hosted Facilitator
-
-Hosted settlement, seller onboarding, ops console, reconciliation, OIDC/OpenFGA auth, and provider adapters live outside core:
-
-```text
-services/hosted-facilitator/
-```

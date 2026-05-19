@@ -14,14 +14,14 @@ from pathlib import Path
 
 REQUIRED_MODULES = [
     "omniclaw/__init__.py",
-    "omniclaw/admin_cli.py",
     "omniclaw/cli/__init__.py",
+    "omniclaw/cli/app.py",
     "omniclaw/cli_agent.py",
 ]
 
 EXPECTED_ENTRYPOINTS = {
-    "omniclaw": "omniclaw.admin_cli:main",
-    "omniclaw-cli": "omniclaw.cli_agent:main",
+    "omniclaw": "omniclaw.cli:main",
+    "omniclaw-cli": "omniclaw.cli:main",
 }
 
 
@@ -46,7 +46,9 @@ def verify_wheel_contents(wheel_path: Path) -> None:
 
         parser = configparser.ConfigParser()
         parser.read_string(zf.read(entry_points_name).decode())
-        scripts = dict(parser.items("console_scripts")) if parser.has_section("console_scripts") else {}
+        scripts = (
+            dict(parser.items("console_scripts")) if parser.has_section("console_scripts") else {}
+        )
 
         for script_name, target in EXPECTED_ENTRYPOINTS.items():
             actual = scripts.get(script_name)
@@ -78,7 +80,8 @@ def smoke_install(wheel_path: Path) -> None:
                 "import pathlib, sysconfig; "
                 "site = pathlib.Path(sysconfig.get_paths()['purelib']); "
                 "required = [site / 'omniclaw' / '__init__.py', "
-                "site / 'omniclaw' / 'admin_cli.py', site / 'omniclaw' / 'cli' / '__init__.py', "
+                "site / 'omniclaw' / 'cli' / '__init__.py', "
+                "site / 'omniclaw' / 'cli' / 'app.py', "
                 "site / 'omniclaw' / 'cli_agent.py']; "
                 "missing = [str(p) for p in required if not p.exists()]; "
                 "assert not missing, f'missing installed files: {missing}'; "

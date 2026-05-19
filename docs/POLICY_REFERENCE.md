@@ -260,20 +260,20 @@ Agent can pay everyone EXCEPT these addresses/domains.
 }
 ```
 
-### Seller Agent (Receives Payments)
+### Receive-Only Agent
 ```json
 {
   "version": "2.0",
   "tokens": {
-    "seller-agent": {
+    "receive-only-agent": {
       "wallet_alias": "primary",
       "active": true,
-      "label": "Seller Agent"
+      "label": "Receive-Only Agent"
     }
   },
   "wallets": {
     "primary": {
-      "name": "Seller Wallet",
+      "name": "Receive-Only Wallet",
       "limits": {
         "daily_max": "0",
         "per_tx_max": "0"

@@ -2,8 +2,6 @@
 
 This docs tree is for OmniClaw core: buyer-side agent payment infrastructure, policy controls, wallet routing, and x402 payment execution.
 
-Hosted facilitator documentation now lives in [`../services/hosted-facilitator/docs`](../services/hosted-facilitator/docs).
-
 ## Core Guides
 
 | Guide | Covers |
@@ -15,11 +13,3 @@ Hosted facilitator documentation now lives in [`../services/hosted-facilitator/d
 | [Policy Reference](POLICY_REFERENCE.md) | Wallets, budgets, confirmations, recipient rules |
 | [Production Readiness](production-readiness.md) | Buyer/payment release checklist |
 | [Production Hardening](PRODUCTION_HARDENING.md) | Core deployment controls |
-
-## Hosted Facilitator Guides
-
-Use the hosted facilitator docs for seller onboarding, facilitator URLs, project API keys, settlement/reconciliation, ops-console, and provider expansion:
-
-```text
-services/hosted-facilitator/docs/
-```

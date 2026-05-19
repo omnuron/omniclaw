@@ -2,12 +2,10 @@
 
 This checklist is for OmniClaw core: buyer-side agent payment infrastructure, policy controls, wallet routing, and x402 buyer execution.
 
-Hosted facilitator operations live in `services/hosted-facilitator`.
-
 ## Core Readiness
 
 - `omniclaw-cli can-pay` works for the target wallet and policy.
-- `omniclaw-cli inspect-x402` reports the seller requirements and selected buyer route.
+- `omniclaw-cli inspect-x402` reports the payment requirements and selected buyer route.
 - `omniclaw-cli pay` executes through `/api/v1/pay`.
 - Policy blocks unsafe recipients before money moves.
 - Idempotency keys are supplied for production payment calls.
@@ -19,7 +17,7 @@ Hosted facilitator operations live in `services/hosted-facilitator`.
 
 For a production canary, capture:
 
-- seller URL
+- paid resource URL
 - `inspect-x402` output
 - `pay` output
 - transaction hash or settlement ID
@@ -34,11 +32,4 @@ Run before shipping core changes:
 uv sync --extra dev
 uv run pytest -q
 python3 scripts/release_verify.sh
-```
-
-Run hosted facilitator checks from its standalone directory:
-
-```bash
-cd services/hosted-facilitator
-uv run --extra dev python -m pytest -q
 ```

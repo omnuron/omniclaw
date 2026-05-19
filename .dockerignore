@@ -2,7 +2,7 @@
 .env
 .env.*
 !.env.example
-hosted.env
+*.env
 *.key
 *.pem
 *.p12
@@ -29,8 +29,3 @@ video/
 apps/ops-console/.next
 apps/ops-console/node_modules
 apps/ops-console/.npm-cache
-services/hosted-facilitator/.venv
-services/hosted-facilitator/hosted.env
-services/hosted-facilitator/apps/ops-console/.next
-services/hosted-facilitator/apps/ops-console/node_modules
-services/hosted-facilitator/apps/ops-console/test-results

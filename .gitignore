@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 .env.local
+*.env
 *.pem
 *.key
 secrets.json

@@ -72,16 +72,15 @@ python3 scripts/generate_cli_reference.py
 - use `can-pay` before a new recipient when policy allow/deny matters
 - use `balance-detail` when Gateway state matters
 - use `--idempotency-key` for job-based payments
-- for x402 URLs, `--amount` can be omitted because the payment requirements come from the seller endpoint
-- hosted seller/facilitator operations live under `services/hosted-facilitator`
+- for x402 URLs, `--amount` can be omitted because the payment requirements come from the paid endpoint
 
 ## Example Flows
 
 Buyer paying an x402 endpoint:
 
 ```bash
-omniclaw-cli can-pay --recipient http://seller-host:8000/api/data
-omniclaw-cli pay --recipient http://seller-host:8000/api/data --idempotency-key job-123
+omniclaw-cli can-pay --recipient http://paid-service:8000/api/data
+omniclaw-cli pay --recipient http://paid-service:8000/api/data --idempotency-key job-123
 ```
 
 Buyer paying a direct address:

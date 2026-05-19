@@ -15,13 +15,13 @@ client = OmniClaw()
 ```python
 await client.pay(
     wallet_id="wallet-id",
-    recipient="https://seller.example.com/compute",
+    recipient="https://paid.example.com/compute",
     amount=None,
     idempotency_key="job-123",
 )
 ```
 
-Use `amount=None` for x402 URLs where the seller publishes the amount in `PAYMENT-REQUIRED`.
+Use `amount=None` for x402 URLs where the endpoint publishes the amount in `PAYMENT-REQUIRED`.
 
 ### Gateway Buyer Helpers
 
@@ -43,13 +43,5 @@ The local policy engine exposes buyer payment, wallet, ledger, policy, and x402 
 Start it with:
 
 ```bash
-omniclaw server --port 8080
-```
-
-## Hosted Facilitator APIs
-
-Seller project APIs, facilitator `/supported`, `/verify`, `/settle`, ops APIs, and seller dashboard APIs belong to the hosted facilitator service:
-
-```text
-services/hosted-facilitator/docs/
+docker compose up --build omniclaw-agent
 ```

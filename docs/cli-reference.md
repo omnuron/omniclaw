@@ -11,14 +11,14 @@ omniclaw-cli configure --server-url http://localhost:8080 --token agent-token --
 ## Inspect A Paid URL
 
 ```bash
-omniclaw-cli can-pay --recipient https://seller.example.com/compute
-omniclaw-cli inspect-x402 --recipient https://seller.example.com/compute
+omniclaw-cli can-pay --recipient https://paid.example.com/compute
+omniclaw-cli inspect-x402 --recipient https://paid.example.com/compute
 ```
 
 ## Pay
 
 ```bash
-omniclaw-cli pay --recipient https://seller.example.com/compute --idempotency-key job-123
+omniclaw-cli pay --recipient https://paid.example.com/compute --idempotency-key job-123
 omniclaw-cli pay --recipient 0xRecipient --amount 5.00 --idempotency-key job-124
 ```
 
@@ -31,5 +31,3 @@ omniclaw-cli intents
 omniclaw-cli confirmations
 omniclaw-cli status
 ```
-
-Seller-facing paid endpoint hosting moved to the standalone hosted facilitator service.

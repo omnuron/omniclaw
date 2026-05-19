@@ -482,9 +482,9 @@ class GatewayWalletManager:
                 approve_func = usdc.functions.approve(gateway_address, amount)
                 approve_tx = self._build_tx(
                     to=usdc_address,
-                    data=approve_func.build_transaction(
-                        {"from": self._address, "gas": 50000}
-                    )["data"],
+                    data=approve_func.build_transaction({"from": self._address, "gas": 50000})[
+                        "data"
+                    ],
                 )
                 approval_tx_hash = self._sign_and_send(
                     approve_tx,
@@ -502,9 +502,7 @@ class GatewayWalletManager:
             deposit_func = gateway.functions.deposit(usdc_address, amount)
             deposit_tx = self._build_tx(
                 to=gateway_address,
-                data=deposit_func.build_transaction(
-                    {"from": self._address, "gas": 100000}
-                )["data"],
+                data=deposit_func.build_transaction({"from": self._address, "gas": 100000})["data"],
                 value=0,
             )
 
