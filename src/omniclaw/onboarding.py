@@ -795,8 +795,8 @@ def print_doctor_status(
         for step in next_steps:
             print(f"  - {step}")
         if status.get("can_sync_to_env"):
-            print("\n  ð¡ TIP: You have a saved Entity Secret but it's not in your environment.")
-            print("     Run: omniclaw setup  # to sync it automatically")
+            print("\n  TIP: You have a saved Entity Secret but it's not in your environment.")
+            print("     Export ENTITY_SECRET in the deployment environment before production use.")
         print()
 
     print("Ready to use." if status["ready"] else "Setup needs attention.")

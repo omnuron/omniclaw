@@ -10,7 +10,6 @@ from .commands import confirmations as confirmations_cmd
 from .commands import intents as intents_cmd
 from .commands import ledger as ledger_cmd
 from .commands import payments as payments_cmd
-from .commands import serve as serve_cmd
 from .commands import status as status_cmd
 from .commands import wallet as wallet_cmd
 from .config import is_quiet
@@ -22,8 +21,8 @@ warnings.filterwarnings("ignore", category=UserWarning, module="web3")
 
 app = typer.Typer(
     help=(
-        "omniclaw-cli - zero-trust execution layer for policy-controlled agent payments, "
-        "x402 services, and agentic commerce"
+        "omniclaw-cli - zero-trust execution layer for policy-controlled agent payments "
+        "and x402 buyer flows"
     )
 )
 
@@ -66,7 +65,6 @@ payments_cmd.register(app)
 intents_cmd.register(app, intents_app)
 ledger_cmd.register(app)
 confirmations_cmd.register(app, confirmations_app)
-serve_cmd.register(app)
 status_cmd.register(app)
 
 app.add_typer(wallet_app, name="wallet")

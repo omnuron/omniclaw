@@ -27,14 +27,11 @@ from omniclaw.agent.models import (
     WalletInfo,
     X402InspectRequest,
     X402InspectResponse,
-    X402RequirementsRequest,
-    X402VerifyRequest,
 )
 from omniclaw.agent.policy import PolicyManager, WalletManager
 from omniclaw.core.logging import get_logger
 from omniclaw.core.types import PaymentMethod
 from omniclaw.guards.confirmations import ConfirmationStore
-from omniclaw.ledger import LedgerEntry, LedgerEntryStatus, LedgerEntryType
 
 if TYPE_CHECKING:
     from omniclaw import OmniClaw
@@ -80,7 +77,6 @@ async def _choose_x402_route(
         prefer_gateway=False,
         source_network=agent_network,
     )
-
     gateway_available_balance: str | None = None
     gateway_ready: bool | None = None
     gateway_reason: str | None = None
@@ -1319,110 +1315,3 @@ async def x402_inspect(
         selected_pay_to=selected_kind.recipient if selected_kind else None,
         seller_accepts=seller_accepts,
     )
-
-
-@router.post("/x402/verify")
-async def x402_verify(
-    request: X402VerifyRequest,
-    agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: OmniClaw = Depends(get_omniclaw_client),
-):
-    """Verify and settle an incoming x402 payment signature (for 'omniclaw-cli serve')."""
-    import base64
-    import json
-
-    try:
-        if not client._nano_client:
-            return {"valid": False, "error": "Nanopayment client not initialized"}
-
-        sig_data = json.loads(base64.b64decode(request.signature))
-        if int(sig_data.get("x402Version", 2)) == 2 and not sig_data.get("accepted"):
-            return {
-                "valid": False,
-                "error": "Missing accepted requirements in PAYMENT-SIGNATURE payload",
-            }
-
-        from omniclaw.protocols.nanopayments.middleware import GatewayMiddleware
-        from omniclaw.protocols.nanopayments.types import PaymentPayload, PaymentRequirements
-
-        payload = PaymentPayload.from_dict(sig_data)
-        amount_text = request.amount if request.amount.startswith("$") else f"${request.amount}"
-
-        seller_address = await client.get_payment_address(agent.wallet_id)
-        if not seller_address:
-            return {"valid": False, "error": "Seller payment address not found"}
-
-        middleware = GatewayMiddleware(
-            seller_address=seller_address,
-            nanopayment_client=client._nano_client,
-        )
-        requirements_body = await middleware._build_402_response(amount_text)
-        requirements = PaymentRequirements.from_dict(requirements_body)
-
-        result = await client._nano_client.settle(payload, requirements)
-
-        if result.success:
-            await client._ledger.record(
-                LedgerEntry(
-                    wallet_id=agent.wallet_id,
-                    recipient=result.payer or "",
-                    amount=Decimal(str(request.amount)),
-                    entry_type=LedgerEntryType.PAYMENT,
-                    status=LedgerEntryStatus.COMPLETED,
-                    tx_hash=result.transaction,
-                    method="nanopayment_receive",
-                    purpose=f"x402 settlement for {request.resource}",
-                    metadata={
-                        "direction": "incoming",
-                        "resource": request.resource,
-                        "payer": result.payer,
-                        "transaction_id": result.transaction,
-                    },
-                )
-            )
-            return {
-                "valid": True,
-                "sender": result.payer,
-                "amount": request.amount,
-                "transaction": result.transaction,
-            }
-        return {"valid": False, "error": result.error_reason or "Settlement failed"}
-
-    except Exception as e:
-        logger.error(f"x402 verify failed: {e}")
-        return {"valid": False, "error": str(e)}
-
-
-@router.post("/x402/requirements")
-async def x402_requirements(
-    request: X402RequirementsRequest,
-    agent: AuthenticatedAgent = Depends(get_current_agent),
-    client: OmniClaw = Depends(get_omniclaw_client),
-):
-    """Build x402 payment requirements for a seller-side paid endpoint."""
-    try:
-        if not client._nano_client:
-            raise HTTPException(status_code=500, detail="Nanopayment client not initialized")
-
-        from omniclaw.protocols.nanopayments.middleware import GatewayMiddleware
-
-        seller_address = await client.get_payment_address(agent.wallet_id)
-        if not seller_address:
-            raise HTTPException(status_code=404, detail="Seller payment address not found")
-
-        middleware = GatewayMiddleware(
-            seller_address=seller_address,
-            nanopayment_client=client._nano_client,
-        )
-        body = await middleware._build_402_response(request.amount)
-        header_value = middleware._encode_requirements(body)
-        return {
-            "status_code": 402,
-            "detail": body,
-            "headers": {"PAYMENT-REQUIRED": header_value},
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"x402 requirements failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e

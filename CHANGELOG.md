@@ -6,19 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+- Removed the obsolete secondary console entrypoint and pointed both console scripts at the unified `omniclaw.cli` buyer/core CLI.
+- Updated public docs and release verification so removed setup/server/doctor commands are no longer advertised.
+
 ## [0.0.6] - 2026-04-14
 
 ### Added
-- Added the owner/operator `omniclaw facilitator exact` command for self-hosted x402 exact settlement.
-- Added public facilitator documentation covering Circle Gateway, external facilitators, and OmniClaw self-hosted exact settlement.
+- Added x402 exact-settlement buyer support.
+- Added public documentation for Circle Gateway and x402 exact payment flows.
 - Added Arc Testnet exact-settlement support documentation using CAIP-2 `eip155:5042002`.
-- Added B2B SDK examples for vendor APIs, machine-to-vendor payments, external exact facilitators, and self-hosted exact settlement.
-- Added a public `.env.example` with role-based configuration for agents, vendors, facilitators, Circle Gateway, Thirdweb, and production hardening.
+- Added B2B SDK examples for machine-to-machine payments.
+- Added a public `.env.example` with role-based configuration for agents, Circle Gateway, Thirdweb, and production hardening.
 
 ### Changed
-- Moved the owner/operator CLI entrypoint to `omniclaw.admin_cli:main` so it no longer conflicts with the `omniclaw.cli` agent CLI package.
-- Updated release artifact verification for the new admin CLI module and package layout.
-- Reworked public README and docs around agent buyer, SDK buyer, vendor SDK seller, Financial Policy Engine, and facilitator deployment paths.
+- Moved the owner/operator CLI entrypoint away from the `omniclaw.cli` agent CLI package.
+- Updated release artifact verification for the package layout.
+- Reworked public README and docs around agent buyer, SDK buyer, and Financial Policy Engine paths.
 - Updated the OmniClaw CLI skill to require idempotency keys for x402 URL payments.
 - Bumped runtime and shipped CLI skill metadata to `0.0.6`.
 
@@ -50,8 +54,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.0.3] - 2026-03-25
 
 ### Added
-- Multi-facilitator support: Circle Gateway, Coinbase CDP, OrderN, RBX, Thirdweb
-- Seller SDK: Full seller-side SDK for accepting x402 payments
+- Payment rail support: Circle Gateway, Coinbase CDP, OrderN, RBX, Thirdweb
+- x402 buyer support for paid HTTP resources
 - Trust Gate: ERC-8004 based identity and reputation verification
 - Payment Intents: 2-phase commit with fund reservation
 - Enhanced buyer SDK with smart payment routing

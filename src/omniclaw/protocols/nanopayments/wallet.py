@@ -21,7 +21,6 @@ Note:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from typing import Any
@@ -220,20 +219,27 @@ class GatewayWalletManager:
         usdc_address: str | None = None,
     ) -> None:
         self._signer = EIP3009Signer(private_key)
-        self._address = self._signer.address
+        self._address = web3.Web3.to_checksum_address(self._signer.address)
         self._network = network
         chain_id = int(network.split(":")[1])
         self._chain_id = chain_id
         self._w3 = web3.Web3(web3.HTTPProvider(rpc_url))
 
-        # Fix for POA chains (Polygon, etc.) - use legacy buildTransaction
-        from web3.middleware import geth_poa_middleware
+        # Fix for POA chains across web3.py versions.
+        try:
+            from web3.middleware import ExtraDataToPOAMiddleware
 
-        self._w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+            self._w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        except ImportError:
+            from web3.middleware import geth_poa_middleware
+
+            self._w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
         self._client = nanopayment_client
-        self._gateway_address = gateway_address
-        self._usdc_address = usdc_address
+        self._gateway_address = (
+            web3.Web3.to_checksum_address(gateway_address) if gateway_address else None
+        )
+        self._usdc_address = web3.Web3.to_checksum_address(usdc_address) if usdc_address else None
         self._gateway_contract: web3.Contract | None = None
 
     @property
@@ -254,16 +260,19 @@ class GatewayWalletManager:
         """Resolve Gateway Wallet contract address for current network."""
         if self._gateway_address:
             return self._gateway_address
-        return await self._client.get_verifying_contract(self._network)
+        return web3.Web3.to_checksum_address(
+            await self._client.get_verifying_contract(self._network)
+        )
 
     async def _resolve_usdc_address(self) -> str:
         """Resolve USDC token contract address for current network."""
         if self._usdc_address:
             return self._usdc_address
-        return await self._client.get_usdc_address(self._network)
+        return web3.Web3.to_checksum_address(await self._client.get_usdc_address(self._network))
 
     def _get_gateway_contract(self, gateway_address: str) -> web3.Contract:
         """Get or create Gateway contract instance."""
+        gateway_address = web3.Web3.to_checksum_address(gateway_address)
         if (
             self._gateway_contract is None
             or self._gateway_contract.address.lower() != gateway_address.lower()
@@ -296,6 +305,7 @@ class GatewayWalletManager:
 
     def _usdc_contract(self, address: str) -> web3.Contract:
         """Get USDC contract instance."""
+        address = web3.Web3.to_checksum_address(address)
         return self._w3.eth.contract(address=address, abi=_USDC_ABI)
 
     def _decimal_to_atomic(self, amount_decimal: str) -> int:
@@ -321,6 +331,7 @@ class GatewayWalletManager:
         self, to: str, data: str, value: int = 0, nonce: int | None = None
     ) -> dict[str, Any]:
         """Build a base transaction dict."""
+        to = web3.Web3.to_checksum_address(to)
         if nonce is None:
             nonce = self._w3.eth.get_transaction_count(self._address)
         tx: dict[str, Any] = {
@@ -471,7 +482,9 @@ class GatewayWalletManager:
                 approve_func = usdc.functions.approve(gateway_address, amount)
                 approve_tx = self._build_tx(
                     to=usdc_address,
-                    data=approve_func.build_transaction({"gas": 50000})["data"],
+                    data=approve_func.build_transaction({"from": self._address, "gas": 50000})[
+                        "data"
+                    ],
                 )
                 approval_tx_hash = self._sign_and_send(
                     approve_tx,
@@ -489,7 +502,7 @@ class GatewayWalletManager:
             deposit_func = gateway.functions.deposit(usdc_address, amount)
             deposit_tx = self._build_tx(
                 to=gateway_address,
-                data=deposit_func.build_transaction({"gas": 100000})["data"],
+                data=deposit_func.build_transaction({"from": self._address, "gas": 100000})["data"],
                 value=0,
             )
 
@@ -905,29 +918,22 @@ class GatewayWalletManager:
 
     def check_gas_reserve(self) -> tuple[bool, str]:
         """
-        Check if the wallet has enough USDC for gas on Arc network.
-
-        For Arc (and other chains that use USDC as gas), check USDC balance
-        instead of ETH for deposit transaction gas.
+        Check if the wallet has enough native gas balance for the deposit transactions.
 
         Returns:
             Tuple of (has_sufficient_gas, message).
-            has_sufficient_gas is True if USDC balance >= 2x estimated gas cost.
+            has_sufficient_gas is True if native gas balance >= 2x estimated gas cost.
         """
-        # For Arc - use USDC as gas token
         try:
-            usdc_addr = asyncio.get_event_loop().run_until_complete(self._resolve_usdc_address())
-            usdc = self._usdc_contract(usdc_addr)
-            usdc_balance = usdc.functions.balanceOf(self._address).call()
+            balance_wei = self.get_gas_balance_wei()
+            required_wei = self.estimate_gas_cost_wei() * 2
+            has_sufficient = balance_wei >= required_wei
 
-            # Estimate gas cost in USDC (approximate)
-            gas_cost_wei = self.estimate_gas_cost_wei()
-            gas_cost_usdc = gas_cost_wei / 1e6  # Convert to USDC
-
-            balance_usdc = usdc_balance / 1e6
-            has_sufficient = usdc_balance >= (gas_cost_wei * 2)
-
-            msg = f"USDC balance: {balance_usdc:.6f}, Gas cost: {gas_cost_usdc:.6f}"
+            msg = (
+                "native gas balance: "
+                f"{self._w3.from_wei(balance_wei, 'ether')}, "
+                f"required reserve: {self._w3.from_wei(required_wei, 'ether')}"
+            )
 
             return has_sufficient, msg
         except Exception as e:

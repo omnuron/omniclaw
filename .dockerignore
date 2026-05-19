@@ -1,4 +1,14 @@
 .venv
+.env
+.env.*
+!.env.example
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
 .mypy_cache
 .pytest_cache
 .ruff_cache
@@ -16,3 +26,6 @@ __pycache__
 *.pyc
 .pytype
 video/
+apps/ops-console/.next
+apps/ops-console/node_modules
+apps/ops-console/.npm-cache

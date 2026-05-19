@@ -628,13 +628,7 @@ class X402Adapter(ProtocolAdapter):
         if selected_network is None:
             return str(config_rpc_url) if config_rpc_url else None
 
-        try:
-            from omniclaw.facilitator.networks import resolve_exact_settlement_network_profile
-
-            profile = resolve_exact_settlement_network_profile(selected_network)
-            return profile.default_rpc_url
-        except Exception:
-            return str(config_rpc_url) if config_rpc_url else None
+        return str(config_rpc_url) if config_rpc_url else None
 
     def _check_direct_exact_balance(self, selected_requirements: Any) -> dict[str, Any]:
         """

@@ -133,7 +133,7 @@ The ledger stores durable intent state and attempt state. It is the source of tr
 
 ### 5.6 Execution Service
 
-The execution service is the only component permitted to trigger settlement. It uses provider integrations, facilitators, or rail-specific adapters, but only for already-approved intents.
+The execution service is the only component permitted to trigger payment execution. It uses provider integrations or rail-specific adapters, but only for already-approved intents.
 
 ### 5.7 Audit Layer
 
@@ -234,8 +234,8 @@ Not all recipients create the same risk.
 
 The task-derived architecture, which is consistent with OmniClaw’s broader control model, makes this explicit:
 
-- Human-operated vendor
-  Standard vendor allowlist, ordinary approval thresholds, and contractual accountability.
+- Human-operated service
+  Standard recipient allowlist, ordinary approval thresholds, and contractual accountability.
 
 - Internal service
   Potentially looser thresholds, but only when workload identity, service registry entry, destination account, and transaction class match internal control records.
@@ -319,7 +319,7 @@ The credibility of OmniClaw as a research system comes from the fact that these 
 - trust-layer types and verdicts in `src/omniclaw/identity/types.py`
 - guard, reservation, and fund-lock documentation in `docs/FEATURES.md`
 - compliance framing in `docs/compliance-architecture.md`
-- product surfaces across buyer, seller, facilitator, and CLI workflows
+- product surfaces across buyer SDK, policy engine, and CLI workflows
 
 There is also substantial test evidence:
 

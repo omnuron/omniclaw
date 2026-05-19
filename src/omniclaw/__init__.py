@@ -107,8 +107,6 @@ from omniclaw.protocols.nanopayments import (
     ERC20ApprovalError,
     GatewayAPIError,
     GatewayBalance,
-    # Middleware
-    GatewayMiddleware,
     # Wallet
     GatewayWalletManager,
     InvalidPriceError,
@@ -129,7 +127,6 @@ from omniclaw.protocols.nanopayments import (
     NonceReusedError,
     PaymentPayload,
     PaymentRequiredError,
-    PaymentRequiredHTTPError,
     PaymentRequirements,
     SettlementError,
     SignatureVerificationError,
@@ -141,7 +138,6 @@ from omniclaw.protocols.nanopayments import (
     VerifyResponse,
     WithdrawError,
     WithdrawResult,
-    parse_price,
 )
 from omniclaw.trust.gate import TrustGate
 
@@ -218,10 +214,6 @@ __all__ = [
     "NanopaymentProtocolAdapter",
     # Wallet
     "GatewayWalletManager",
-    # Middleware
-    "GatewayMiddleware",
-    "PaymentRequiredHTTPError",
-    "parse_price",
     # Types
     "DepositResult",
     "GatewayBalance",

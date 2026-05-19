@@ -16,7 +16,7 @@ Use it when an internal job runner, workflow engine, or autonomous agent needs t
 Producer service:
 
 ```text
-https://api.vendor.example/compute
+https://api.paid-resource.example/compute
 ```
 
 Consumer service:
@@ -25,9 +25,9 @@ Consumer service:
 export OMNICLAW_SERVER_URL="http://127.0.0.1:8080"
 export OMNICLAW_TOKEN="service-agent-token"
 
-omniclaw-cli can-pay --recipient https://api.vendor.example/compute
-omniclaw-cli inspect-x402 --recipient https://api.vendor.example/compute
-omniclaw-cli pay --recipient https://api.vendor.example/compute --idempotency-key batch-042
+omniclaw-cli can-pay --recipient https://api.paid-resource.example/compute
+omniclaw-cli inspect-x402 --recipient https://api.paid-resource.example/compute
+omniclaw-cli pay --recipient https://api.paid-resource.example/compute --idempotency-key batch-042
 ```
 
 ## Service Contract
@@ -41,23 +41,17 @@ Design the downstream API so a machine can use it without special casing:
 
 ## When To Use Exact Or Gateway
 
-OmniClaw chooses the route based on the seller's advertised requirements:
+OmniClaw chooses the route based on the endpoint's advertised requirements:
 
 - use `GatewayWalletBatched` when the producer supports Circle Gateway nanopayments and the consumer has Gateway balance
 - use `exact` when the producer supports standard x402 settlement
-- let `pay` route directly when the seller is exact-only
+- let `pay` route directly when the endpoint is exact-only
 
 That keeps the consumer side simple: one URL, one policy engine, one payment command.
 
 ## Verification Checklist
 
 - the consumer sees `can-pay: true` before execution
-- `inspect-x402` shows the seller's supported scheme
+- `inspect-x402` shows the endpoint's supported scheme
 - payment succeeds with the same idempotency key on retry
 - the producer logs a single successful fulfillment event
-
-## Related Examples
-
-- [Vendor Integration](../vendor-integration/README.md)
-- [Local Economy](../local-economy/README.md)
-- [External x402 Facilitator](../external-x402-facilitator/README.md)

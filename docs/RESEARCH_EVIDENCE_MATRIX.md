@@ -113,7 +113,7 @@ What to strengthen:
 ## Claim 7: Counterparty-Type-Aware Policy
 
 Claim:
-- Policy should differ for human-operated vendors, internal services, and autonomous-agent counterparties.
+- Policy should differ for human-operated services, internal services, and autonomous-agent counterparties.
 
 Code / Docs:
 - task-derived architecture
@@ -175,14 +175,14 @@ Evidence Type:
 What to strengthen:
 - add an explicit audit-event schema doc
 
-## Claim 11: Seller-Side Replay Resistance
+## Claim 11: x402 Replay Resistance
 
 Claim:
-- Seller or facilitator-side consumed-proof handling can reduce replay acceptance.
+- Consumed-proof handling can reduce x402 replay acceptance.
 
 Code / Docs:
 - whitepaper v1 discussion
-- seller-side nonce handling in `src/omniclaw/seller/seller.py`
+- x402 replay handling design notes
 
 Evidence Type:
 - implementation hook

@@ -101,7 +101,7 @@ Why this matters:
 - Payment-Intent Ledger: durable source of truth for intent state and attempt state
 - Execution Service: performs settlement using approved, bound authorizations only
 - Settlement Provider / Rail: external payment or settlement mechanism
-- Counterparty: vendor, internal service, or autonomous agent receiving payment
+- Counterparty: external service, internal service, or autonomous agent receiving payment
 - Audit Layer: append-only record of decisions and state transitions
 
 ### Trust Boundaries
@@ -293,7 +293,7 @@ Claims to calibrate carefully:
 
 ### 2. Background
 
-- payment rails and facilitators
+- payment rails and adapters
 - wallet execution versus authorization
 - autonomous counterparties and trust signals
 
@@ -335,7 +335,7 @@ Claims to calibrate carefully:
 - artifact overview
 - policy engine
 - ledger and audit components
-- facilitator integrations
+- payment rail integrations
 
 ### 9. Evaluation
 
