@@ -284,6 +284,19 @@ class OmniClaw:
             )
         return network
 
+    @staticmethod
+    def _route_value(route: Any) -> str:
+        return str(route.value if hasattr(route, "value") else route or "").strip().lower()
+
+    @classmethod
+    def _route_uses_gateway_balance(cls, detected_route: Any, preferred_url_route: Any) -> bool:
+        preferred_route = cls._route_value(preferred_url_route)
+        if preferred_route in {"nanopayment", "gateway", "circle_gateway"}:
+            return True
+        if preferred_route == PaymentMethod.X402.value:
+            return False
+        return cls._route_value(detected_route) == PaymentMethod.NANOPAYMENT.value
+
     def _init_nanopayments(self) -> None:
         """Initialize nanopayments components (direct private key only)."""
         if not self._config.nanopayments_enabled:
@@ -975,9 +988,9 @@ class OmniClaw:
         guards_passed: list[str] = []
 
         # Detect payment route early to know which balance to check
+        source_network: Network | None = None
         try:
             # Try to get source network from Circle wallet first, then fall back to config default.
-            source_network = None
             try:
                 wallet_info = self._wallet_service.get_wallet(wallet_id)
                 source_network = Network.from_string(wallet_info.blockchain)
@@ -1086,16 +1099,17 @@ class OmniClaw:
             if consume_intent_id:
                 await self._reservation.release(consume_intent_id)
 
-            # Get appropriate balance based on payment route
-            # For X402/nanopayment routes → check Gateway balance
-            # For Transfer/crosschain routes → check Circle wallet balance
-            circle_balance = self._wallet_service.get_usdc_balance_amount(wallet_id)
+            # Get appropriate balance based on payment route.
+            # Gateway nanopayments check Gateway balance. Direct x402 exact is
+            # delegated to the x402 adapter. Transfer/crosschain routes use Circle balance.
             reserved_total = await self._reservation.get_reserved_total(wallet_id)
+            preferred_url_route = kwargs.get("preferred_url_route")
+            required_amount = amount_decimal
 
-            # Check if this is a Gateway-based route
-            route_uses_gateway = detected_route in (PaymentMethod.X402, PaymentMethod.NANOPAYMENT)
-
-            if route_uses_gateway and self._nano_adapter:
+            if (
+                self._route_uses_gateway_balance(detected_route, preferred_url_route)
+                and self._nano_adapter
+            ):
                 try:
                     gateway_balance = await self.get_gateway_balance(wallet_id)
                     available = Decimal(str(gateway_balance.available_decimal))
@@ -1106,20 +1120,24 @@ class OmniClaw:
                     self._logger.warning(f"Gateway balance check failed: {e}")
                     available = Decimal("0")
                     balance_source = "Gateway available: (check failed)"
+            elif self._route_value(detected_route) == PaymentMethod.X402.value:
+                available = amount_decimal
+                balance_source = "Direct x402: deferred to x402 adapter"
             else:
+                circle_balance = self._wallet_service.get_usdc_balance_amount(wallet_id)
                 available = circle_balance - reserved_total
                 balance_source = f"Circle: {available}"
             if lock_lost_event.is_set():
                 raise PaymentError("Wallet lock lease was lost before execution could start.")
-            if amount_decimal > available:
-                error_msg = f"Insufficient available balance ({balance_source}, Reserved: {reserved_total}, Required: {amount_decimal})"
+            if required_amount > available:
+                error_msg = f"Insufficient available balance ({balance_source}, Reserved: {reserved_total}, Required: {required_amount})"
                 if guards_chain and reservation_tokens:
                     await guards_chain.release(reservation_tokens)
                 await self._ledger.update_status(
                     ledger_entry.id, LedgerEntryStatus.FAILED, metadata_updates={"error": error_msg}
                 )
                 raise InsufficientBalanceError(
-                    error_msg, current_balance=available, required_amount=amount_decimal
+                    error_msg, current_balance=available, required_amount=required_amount
                 )
 
             # Resilience Shell
@@ -1359,15 +1377,18 @@ class OmniClaw:
         amount_decimal = Decimal(str(amount))
 
         # Detect the actual route early so early-return reasons include it
+        source_network: Network | None = None
         try:
+            source_network = Network.from_string(
+                self._wallet_service.get_wallet(wallet_id).blockchain
+            )
             detected_route = (
                 self._router.detect_method(
                     recipient,
-                    source_network=Network.from_string(
-                        self._wallet_service.get_wallet(wallet_id).blockchain
-                    ),
+                    source_network=source_network,
                     destination_chain=kwargs.get("destination_chain"),
                     amount=amount_decimal,
+                    preferred_url_route=kwargs.get("preferred_url_route"),
                 )
                 or PaymentMethod.TRANSFER
             )
@@ -1384,15 +1405,17 @@ class OmniClaw:
                 ),
             )
 
-        # Get appropriate balance based on payment route
-        # For X402/nanopayment routes → check Gateway balance
-        # For Transfer/crosschain routes → check Circle wallet balance
-        circle_balance = self._wallet_service.get_usdc_balance_amount(wallet_id)
+        # Get appropriate balance based on payment route.
+        # Gateway nanopayments check Gateway balance. Direct x402 exact is delegated
+        # to the x402 adapter. Transfer/crosschain routes use Circle balance.
         reserved_total = await self._reservation.get_reserved_total(wallet_id)
+        preferred_url_route = kwargs.get("preferred_url_route")
+        required_amount = amount_decimal
 
-        route_uses_gateway = detected_route in (PaymentMethod.X402, PaymentMethod.NANOPAYMENT)
-
-        if route_uses_gateway and self._nano_adapter:
+        if (
+            self._route_uses_gateway_balance(detected_route, preferred_url_route)
+            and self._nano_adapter
+        ):
             try:
                 # Direct private key mode - use ON-CHAIN query
                 from omniclaw.protocols.nanopayments.wallet import GatewayWalletManager
@@ -1412,15 +1435,19 @@ class OmniClaw:
                 self._logger.warning(f"Gateway balance check failed: {e}")
                 available = 0
                 balance_source = "Gateway: (check failed)"
+        elif self._route_value(detected_route) == PaymentMethod.X402.value:
+            available = amount_decimal
+            balance_source = "Direct x402: deferred to x402 adapter"
         else:
+            circle_balance = self._wallet_service.get_usdc_balance_amount(wallet_id)
             available = circle_balance - reserved_total
             balance_source = f"Circle: {available}"
 
-        if amount_decimal > available:
+        if required_amount > available:
             return SimulationResult(
                 would_succeed=False,
                 route=detected_route,
-                reason=f"Insufficient available balance ({balance_source}, Reserved: {reserved_total}, Required: {amount_decimal})",
+                reason=f"Insufficient available balance ({balance_source}, Reserved: {reserved_total}, Required: {required_amount})",
             )
 
         # Check guards first

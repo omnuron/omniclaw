@@ -8,7 +8,8 @@ import os
 import tempfile
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -88,33 +89,39 @@ class TestClientInitialization:
                 assert client.config.entity_secret == "managed_secret"
 
     def test_init_production_requires_hardening_envs(self):
-        with patch.dict(
-            os.environ,
-            {
-                "CIRCLE_API_KEY": "prod_api_key",
-                "ENTITY_SECRET": "prod_entity_secret",
-                "OMNICLAW_ENV": "production",
-            },
-            clear=True,
-        ), pytest.raises(
-            ConfigurationError, match="Missing required production environment variables"
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "CIRCLE_API_KEY": "prod_api_key",
+                    "ENTITY_SECRET": "prod_entity_secret",
+                    "OMNICLAW_ENV": "production",
+                },
+                clear=True,
+            ),
+            pytest.raises(
+                ConfigurationError, match="Missing required production environment variables"
+            ),
         ):
             OmniClaw(network=Network.ARC_TESTNET)
 
     def test_init_production_requires_strict_settlement(self):
-        with patch.dict(
-            os.environ,
-            {
-                "CIRCLE_API_KEY": "prod_api_key",
-                "ENTITY_SECRET": "prod_entity_secret",
-                "OMNICLAW_ENV": "production",
-                "OMNICLAW_SELLER_NONCE_REDIS_URL": "redis://localhost:6379/0",
-                "OMNICLAW_WEBHOOK_VERIFICATION_KEY": "dummy-key",
-                "OMNICLAW_WEBHOOK_DEDUP_DB_PATH": "/tmp/omniclaw_webhook_dedup.sqlite3",
-                "OMNICLAW_STRICT_SETTLEMENT": "false",
-            },
-            clear=True,
-        ), pytest.raises(ConfigurationError, match="OMNICLAW_STRICT_SETTLEMENT must be true"):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "CIRCLE_API_KEY": "prod_api_key",
+                    "ENTITY_SECRET": "prod_entity_secret",
+                    "OMNICLAW_ENV": "production",
+                    "OMNICLAW_SELLER_NONCE_REDIS_URL": "redis://localhost:6379/0",
+                    "OMNICLAW_WEBHOOK_VERIFICATION_KEY": "dummy-key",
+                    "OMNICLAW_WEBHOOK_DEDUP_DB_PATH": "/tmp/omniclaw_webhook_dedup.sqlite3",
+                    "OMNICLAW_STRICT_SETTLEMENT": "false",
+                },
+                clear=True,
+            ),
+            pytest.raises(ConfigurationError, match="OMNICLAW_STRICT_SETTLEMENT must be true"),
+        ):
             OmniClaw(network=Network.ARC_TESTNET)
 
 
@@ -386,6 +393,211 @@ class TestPayIdempotency:
 
         assert len(captured_keys) == 2
         assert captured_keys[0] == captured_keys[1]
+
+
+class TestUrlRouteBalanceChecks:
+    def test_direct_x402_route_does_not_use_gateway_balance(self):
+        assert (
+            OmniClaw._route_uses_gateway_balance(
+                PaymentMethod.X402,
+                PaymentMethod.X402.value,
+            )
+            is False
+        )
+
+    def test_nanopayment_route_uses_gateway_balance(self):
+        assert (
+            OmniClaw._route_uses_gateway_balance(
+                PaymentMethod.NANOPAYMENT,
+                PaymentMethod.NANOPAYMENT.value,
+            )
+            is True
+        )
+
+    @pytest.mark.asyncio
+    async def test_pay_direct_x402_delegates_balance_to_adapter(self, client):
+        client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
+        client._wallet_service.get_usdc_balance_amount = MagicMock(
+            side_effect=AssertionError("Circle balance not used")
+        )
+        client._router.detect_method = MagicMock(return_value=PaymentMethod.X402)
+        client._router._find_adapter = MagicMock(side_effect=AssertionError("extra probe not used"))
+        client._router.pay = AsyncMock(
+            return_value=PaymentResult(
+                success=True,
+                transaction_id="x402-tx",
+                blockchain_tx=None,
+                amount=Decimal("0.001"),
+                recipient="http://127.0.0.1:4023/compute",
+                method=PaymentMethod.X402,
+                status=PaymentStatus.COMPLETED,
+            )
+        )
+        client.get_gateway_balance = AsyncMock(side_effect=AssertionError("gateway not used"))
+
+        result = await client.pay(
+            wallet_id="wallet-123",
+            recipient="http://127.0.0.1:4023/compute",
+            amount=Decimal("0.001"),
+            preferred_url_route=PaymentMethod.X402.value,
+            skip_guards=True,
+        )
+
+        assert result.success is True
+        client.get_gateway_balance.assert_not_awaited()
+        client._wallet_service.get_usdc_balance_amount.assert_not_called()
+        client._router._find_adapter.assert_not_called()
+        client._router.pay.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_pay_direct_x402_does_not_require_circle_wallet_balance(self, client):
+        client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
+        client._wallet_service.get_usdc_balance_amount = MagicMock(
+            side_effect=AssertionError("Circle balance not used")
+        )
+        client._router.detect_method = MagicMock(return_value=PaymentMethod.X402)
+        client._router.pay = AsyncMock(
+            return_value=PaymentResult(
+                success=True,
+                transaction_id="x402-tx",
+                blockchain_tx=None,
+                amount=Decimal("0.001"),
+                recipient="http://127.0.0.1:4023/compute",
+                method=PaymentMethod.X402,
+                status=PaymentStatus.COMPLETED,
+            )
+        )
+        client.get_gateway_balance = AsyncMock(side_effect=AssertionError("gateway not used"))
+
+        result = await client.pay(
+            wallet_id="wallet-123",
+            recipient="http://127.0.0.1:4023/compute",
+            amount=Decimal("0.001"),
+            preferred_url_route=PaymentMethod.X402.value,
+            skip_guards=True,
+        )
+
+        assert result.success is True
+        client.get_gateway_balance.assert_not_awaited()
+        client._wallet_service.get_usdc_balance_amount.assert_not_called()
+        client._router.pay.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_pay_nanopayment_route_uses_gateway_balance(self, client):
+        from omniclaw.protocols.nanopayments import GatewayBalance
+
+        client._nano_adapter = object()
+        client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
+        client._wallet_service.get_usdc_balance_amount = MagicMock(
+            side_effect=AssertionError("Circle balance not used")
+        )
+        client._router.detect_method = MagicMock(return_value=PaymentMethod.NANOPAYMENT)
+        client._router._find_adapter = MagicMock(side_effect=AssertionError("direct x402 not used"))
+        client.get_gateway_balance = AsyncMock(
+            return_value=GatewayBalance(
+                total=2000,
+                available=2000,
+                formatted_total="0.002 USDC",
+                formatted_available="0.002 USDC",
+            )
+        )
+        client._router.pay = AsyncMock(
+            return_value=PaymentResult(
+                success=True,
+                transaction_id="nano-tx",
+                blockchain_tx=None,
+                amount=Decimal("0.001"),
+                recipient="http://127.0.0.1:4023/compute",
+                method=PaymentMethod.NANOPAYMENT,
+                status=PaymentStatus.COMPLETED,
+            )
+        )
+
+        result = await client.pay(
+            wallet_id="wallet-123",
+            recipient="http://127.0.0.1:4023/compute",
+            amount=Decimal("0.001"),
+            preferred_url_route=PaymentMethod.NANOPAYMENT.value,
+            skip_guards=True,
+        )
+
+        assert result.success is True
+        client.get_gateway_balance.assert_awaited_once_with("wallet-123")
+        client._wallet_service.get_usdc_balance_amount.assert_not_called()
+        client._router._find_adapter.assert_not_called()
+        client._router.pay.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_simulate_direct_x402_does_not_preflight_twice(self, client):
+        from omniclaw.core.types import SimulationResult
+
+        client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
+        client._wallet_service.get_usdc_balance_amount = MagicMock(
+            side_effect=AssertionError("Circle balance not used")
+        )
+        client._router.detect_method = MagicMock(return_value=PaymentMethod.X402)
+        client._router._find_adapter = MagicMock(side_effect=AssertionError("extra probe not used"))
+        client._router.simulate = AsyncMock(
+            return_value=SimulationResult(
+                would_succeed=True,
+                route=PaymentMethod.X402,
+            )
+        )
+        client.get_gateway_balance = AsyncMock(side_effect=AssertionError("gateway not used"))
+
+        result = await client.simulate(
+            wallet_id="wallet-123",
+            recipient="http://127.0.0.1:4023/compute",
+            amount=Decimal("0.001"),
+            preferred_url_route=PaymentMethod.X402.value,
+        )
+
+        assert result.would_succeed is True
+        client.get_gateway_balance.assert_not_awaited()
+        client._wallet_service.get_usdc_balance_amount.assert_not_called()
+        client._router._find_adapter.assert_not_called()
+        client._router.simulate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_simulate_nanopayment_route_uses_gateway_balance(self, client, monkeypatch):
+        from omniclaw.core.types import SimulationResult
+
+        class FakeGatewayWalletManager:
+            def __init__(self, **kwargs):
+                pass
+
+            async def get_gateway_available_balance(self):
+                return Decimal("0.002")
+
+        client._nano_adapter = SimpleNamespace(signer=SimpleNamespace(raw_key="unused"))
+        client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
+        client._wallet_service.get_usdc_balance_amount = MagicMock(
+            side_effect=AssertionError("Circle balance not used")
+        )
+        client._router.detect_method = MagicMock(return_value=PaymentMethod.NANOPAYMENT)
+        client._router._find_adapter = MagicMock(side_effect=AssertionError("direct x402 not used"))
+        monkeypatch.setattr(
+            "omniclaw.protocols.nanopayments.wallet.GatewayWalletManager",
+            FakeGatewayWalletManager,
+        )
+        client._router.simulate = AsyncMock(
+            return_value=SimulationResult(
+                would_succeed=True,
+                route=PaymentMethod.NANOPAYMENT,
+            )
+        )
+
+        result = await client.simulate(
+            wallet_id="wallet-123",
+            recipient="http://127.0.0.1:4023/compute",
+            amount=Decimal("0.001"),
+            preferred_url_route=PaymentMethod.NANOPAYMENT.value,
+        )
+
+        assert result.would_succeed is True
+        client._wallet_service.get_usdc_balance_amount.assert_not_called()
+        client._router._find_adapter.assert_not_called()
+        client._router.simulate.assert_awaited_once()
 
 
 class TestSettlementReconciliation:

@@ -1,6 +1,7 @@
 """Unit tests for PaymentRouter and TransferAdapter."""
 
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -363,6 +364,17 @@ class TestPaymentRouterDetection:
 
         # X402 adapter not registered
         assert method is None
+
+    def test_preferred_route_matches_enum_and_string(
+        self,
+        payment_router: PaymentRouter,
+    ) -> None:
+        """Test preferred URL route accepts enum and string values."""
+        adapter = SimpleNamespace(method=PaymentMethod.X402)
+
+        assert payment_router._matches_preferred_route(adapter, PaymentMethod.X402) is True
+        assert payment_router._matches_preferred_route(adapter, PaymentMethod.X402.value) is True
+        assert payment_router._matches_preferred_route(adapter, PaymentMethod.NANOPAYMENT) is False
 
     def test_can_handle(
         self,
