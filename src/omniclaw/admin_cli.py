@@ -37,20 +37,11 @@ ENV_VARS = {
         "OMNICLAW_STORAGE_BACKEND": "Storage backend: memory or redis",
         "OMNICLAW_REDIS_URL": "Redis connection URL (when using redis)",
         "OMNICLAW_LOG_LEVEL": "Logging: DEBUG, INFO, WARNING, ERROR",
-        "OMNICLAW_X402_FACILITATOR_PRIVATE_KEY": (
-            "Private key used by a self-hosted x402 exact facilitator"
-        ),
-        "OMNICLAW_X402_FACILITATOR_NETWORK_PROFILE": ("Self-hosted facilitator network profile"),
-        "OMNICLAW_X402_FACILITATOR_RPC_URL": "Self-hosted facilitator RPC endpoint",
-        "OMNICLAW_X402_FACILITATOR_NETWORKS": (
-            "Comma-separated CAIP-2 networks accepted by the facilitator"
-        ),
     },
     "production": {
         "OMNICLAW_ENV": "Set to production for mainnet/strict mode",
         "OMNICLAW_STRICT_SETTLEMENT": "Enable strict settlement validation",
         "OMNICLAW_WEBHOOK_VERIFICATION_KEY": "Public key for webhook signatures",
-        "OMNICLAW_SELLER_NONCE_REDIS_URL": "Redis for distributed nonce (multi-instance)",
     },
 }
 
@@ -86,6 +77,31 @@ def print_env_vars() -> None:
         print(f"  {var}")
         print(f"    {desc}")
         print(f"    {status}\n")
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number") from exc
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+
+
+def _require_positive(name: str, value: float | int) -> None:
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than zero")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -128,36 +144,6 @@ def build_parser() -> argparse.ArgumentParser:
     server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     server_parser.add_argument("--port", type=int, default=8080, help="Port to listen on")
     server_parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-
-    facilitator_parser = subparsers.add_parser(
-        "facilitator",
-        help="Run OmniClaw-operated x402 facilitator services",
-    )
-    facilitator_sub = facilitator_parser.add_subparsers(dest="facilitator_command")
-    exact_parser = facilitator_sub.add_parser(
-        "exact",
-        help="Start a self-hosted x402 exact facilitator",
-    )
-    exact_parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    exact_parser.add_argument("--port", type=int, default=4022, help="Port to listen on")
-    exact_parser.add_argument(
-        "--network-profile",
-        default=None,
-        help="OmniClaw network profile, for example BASE-SEPOLIA or ARC-TESTNET",
-    )
-    exact_parser.add_argument(
-        "--network",
-        action="append",
-        default=None,
-        help="Accepted CAIP-2 network. Repeat to support multiple networks.",
-    )
-    exact_parser.add_argument("--rpc-url", default=None, help="RPC URL for settlement")
-    exact_parser.add_argument(
-        "--private-key",
-        default=None,
-        help="Facilitator settlement private key. Prefer env in shared shells.",
-    )
-    exact_parser.add_argument("--title", default=None, help="FastAPI title")
 
     policy_parser = subparsers.add_parser("policy", help="Policy utilities (lint/validate)")
     policy_sub = policy_parser.add_subparsers(dest="policy_command")
@@ -205,7 +191,7 @@ def handle_setup(args: argparse.Namespace) -> int:
     print("To start the server locally, run: omniclaw server")
     print(
         "To start via Docker, run: "
-        "docker compose -f examples/local-economy/docker-compose.payment-agent.yml up -d"
+        "docker compose -f examples/agent/docker-compose.yml up -d"
     )
     return 0
 
@@ -251,85 +237,6 @@ def handle_server(args: argparse.Namespace) -> int:
     return 0
 
 
-def handle_facilitator_exact(args: argparse.Namespace) -> int:
-    import uvicorn
-    from dotenv import load_dotenv
-
-    from omniclaw.facilitator import (
-        ExactFacilitatorConfig,
-        create_exact_facilitator_app,
-        resolve_exact_settlement_network_profile,
-    )
-
-    if os.path.exists(".env.agent"):
-        load_dotenv(".env.agent")
-        print("📄 Loaded configuration from .env.agent")
-    elif os.path.exists(".env"):
-        load_dotenv(".env")
-        print("📄 Loaded configuration from .env")
-
-    profile_name = (
-        args.network_profile
-        or os.getenv("OMNICLAW_X402_FACILITATOR_NETWORK_PROFILE")
-        or os.getenv("OMNICLAW_NETWORK")
-        or "BASE-SEPOLIA"
-    )
-    profile = resolve_exact_settlement_network_profile(profile_name)
-    private_key = (
-        args.private_key
-        or os.getenv("OMNICLAW_X402_FACILITATOR_PRIVATE_KEY")
-        or os.getenv("OMNICLAW_PRIVATE_KEY")
-        or ""
-    ).strip()
-    if not private_key:
-        print(
-            "❌ Error: set OMNICLAW_X402_FACILITATOR_PRIVATE_KEY or pass --private-key "
-            "to run an exact facilitator."
-        )
-        return 1
-
-    explicit_env_networks = tuple(
-        value.strip()
-        for value in os.getenv("OMNICLAW_X402_FACILITATOR_NETWORKS", "").split(",")
-        if value.strip()
-    )
-    networks = tuple(args.network or ()) or explicit_env_networks or (profile.caip2,)
-    rpc_url = (
-        args.rpc_url
-        or os.getenv("OMNICLAW_X402_FACILITATOR_RPC_URL")
-        or profile.default_rpc_url
-        or ""
-    ).strip()
-    if not rpc_url:
-        print(
-            "❌ Error: set OMNICLAW_X402_FACILITATOR_RPC_URL or pass --rpc-url "
-            f"for {profile.label}."
-        )
-        return 1
-
-    config = ExactFacilitatorConfig(
-        private_key=private_key,
-        rpc_url=rpc_url,
-        networks=networks,
-        network_profile=profile.label,
-        port=args.port,
-        host=args.host,
-        title=args.title or f"OmniClaw Exact Facilitator ({profile.label})",
-    )
-    app = create_exact_facilitator_app(config)
-    print(f"🚀 Starting OmniClaw x402 exact facilitator on {config.host}:{config.port}")
-    print(f"   Profile: {profile.label}")
-    print(f"   Networks: {', '.join(config.networks)}")
-    print(f"   RPC: {config.rpc_url}")
-    uvicorn.run(
-        app,
-        host=config.host,
-        port=config.port,
-        log_level=os.getenv("OMNICLAW_LOG_LEVEL", "info").lower(),
-    )
-    return 0
-
-
 def handle_policy_lint(args: argparse.Namespace) -> int:
     from omniclaw.agent.policy_schema import validate_policy
 
@@ -367,9 +274,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "server":
         return handle_server(args)
 
-    if args.command == "facilitator" and args.facilitator_command == "exact":
-        return handle_facilitator_exact(args)
-
     if args.command == "policy" and args.policy_command == "lint":
         return handle_policy_lint(args)
 
@@ -377,7 +281,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("\nCommands:")
     print("  setup       - Quick credentials configuration")
     print("  server      - Start the Financial Policy Engine server")
-    print("  facilitator - Run OmniClaw-operated x402 facilitator services")
     print("  doctor      - Inspect setup and credentials")
     print("  env         - List all environment variables")
     return 1

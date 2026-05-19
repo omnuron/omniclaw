@@ -667,54 +667,6 @@ class NanopaymentResult:
 
 
 # =============================================================================
-# SELLER PAYMENT INFO
-# =============================================================================
-
-
-@dataclass(frozen=True)
-class PaymentInfo:
-    """
-    Payment information for a seller receiving payment.
-
-    Attached to requests in @agent.sell() decorated functions
-    via agent.current_payment().
-    """
-
-    verified: bool
-    """True if the payment was verified and settled."""
-
-    payer: str
-    """Buyer's address."""
-
-    amount: str
-    """Amount in USDC atomic units."""
-
-    network: str
-    """CAIP-2 network identifier."""
-
-    transaction: str | None
-    """Batch reference from settlement."""
-
-    @property
-    def amount_decimal(self) -> str:
-        """Amount as decimal USDC string."""
-        from decimal import Decimal
-
-        return str(Decimal(self.amount) / Decimal("1000000"))
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict."""
-        return {
-            "verified": self.verified,
-            "payer": self.payer,
-            "amount": self.amount,
-            "amount_decimal": self.amount_decimal,
-            "network": self.network,
-            "transaction": self.transaction,
-        }
-
-
-# =============================================================================
 # WALLET OPERATION RESULTS
 # =============================================================================
 

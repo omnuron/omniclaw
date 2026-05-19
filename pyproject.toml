@@ -55,9 +55,9 @@ dependencies = [
     "redis==7.1.0",
     "tenacity==8.2.0",
     # x402 official SDK and signing
-    "x402[httpx]>=2.0.0",
-    "eth-account==0.12.0",
-    "web3>=6.0.0",
+    "x402[evm,fastapi,httpx]>=2.5.0",
+    "eth-account>=0.13.6",
+    "web3>=7.0.0",
     "typer>=0.15.0",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",

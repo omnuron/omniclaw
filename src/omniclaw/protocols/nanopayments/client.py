@@ -150,7 +150,7 @@ def _caip2_to_circle_domain_id(caip2: str) -> int:
     domain = CAIP2_TO_CIRCLE_DOMAIN.get(caip2)
     if domain is not None:
         return domain
-    return 0
+    raise UnsupportedNetworkError(network=caip2)
 
 
 def _to_int(value: Any) -> int:
@@ -599,9 +599,17 @@ class NanopaymentClient:
         Raises:
             GatewayAPIError: On HTTP errors.
         """
+        circle_payload = _convert_payload_for_circle(payload.to_dict())
+        circle_requirements = _convert_requirements_for_circle(requirements.to_dict())
+        selected_requirement = (
+            circle_requirements["accepts"][0]
+            if circle_requirements.get("accepts")
+            else circle_requirements
+        )
+        circle_payload["accepted"] = selected_requirement
         body: dict[str, Any] = {
-            "paymentPayload": _convert_payload_for_circle(payload.to_dict()),
-            "paymentRequirements": _convert_requirements_for_circle(requirements.to_dict()),
+            "paymentPayload": circle_payload,
+            "paymentRequirements": selected_requirement,
         }
 
         async with NanopaymentHTTPClient(
@@ -754,12 +762,12 @@ class NanopaymentClient:
         """
         await self.get_supported()
 
-        _caip2_to_circle_domain_id(network)
+        domain_id = _caip2_to_circle_domain_id(network)
         body: dict[str, Any] = {
             "token": "USDC",
             "sources": [
                 {
-                    "network": network,
+                    "domain": domain_id,
                     "depositor": address,
                 }
             ],
@@ -789,7 +797,7 @@ class NanopaymentClient:
         formatted_total = "0 USDC"
         formatted_available = "0 USDC"
         if balances:
-            bal = balances[0]
+            bal = _select_gateway_balance(balances, domain_id)
             # Circle returns "balance" field with string amount, no separate available field
             balance_str = bal.get("balance", "0")
             total = _to_int(balance_str)
@@ -804,6 +812,18 @@ class NanopaymentClient:
             formatted_total=formatted_total,
             formatted_available=formatted_available,
         )
+
+
+def _select_gateway_balance(balances: list[Any], domain_id: int) -> dict[str, Any]:
+    for balance in balances:
+        if not isinstance(balance, dict):
+            continue
+        try:
+            if int(str(balance.get("domain"))) == domain_id:
+                return balance
+        except (TypeError, ValueError):
+            continue
+    return {}
 
 
 # =============================================================================

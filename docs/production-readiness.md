@@ -1,128 +1,44 @@
 # Production Readiness
 
-This is the short production checklist for OmniClaw.
+This checklist is for OmniClaw core: buyer-side agent payment infrastructure, policy controls, wallet routing, and x402 buyer execution.
 
-Use it before publishing a release, running a pilot, or validating a real external payment flow.
+Hosted facilitator operations live in `services/hosted-facilitator`.
 
-## What OmniClaw Is
+## Core Readiness
 
-OmniClaw is the policy-controlled execution layer for agent payments.
+- `omniclaw-cli can-pay` works for the target wallet and policy.
+- `omniclaw-cli inspect-x402` reports the seller requirements and selected buyer route.
+- `omniclaw-cli pay` executes through `/api/v1/pay`.
+- Policy blocks unsafe recipients before money moves.
+- Idempotency keys are supplied for production payment calls.
+- Gateway payments require Gateway readiness before selecting `GatewayWalletBatched`.
+- Standard exact x402 payments use the upstream x402 SDK path.
+- Ledger, intent, and webhook records are available for audit.
 
-It does four things:
+## Validation
 
-- inspects what a seller accepts
-- enforces buyer policy before money moves
-- routes to a compatible payment rail
-- records what happened for audit and operations
-
-## Facilitator Strategy
-
-OmniClaw is facilitator-aware. Sellers can use the settlement path that fits their deployment while buyers keep OmniClaw policy controls in front of money movement.
-
-Supported facilitator paths:
-
-- x402.org can validate external standard exact settlement immediately on Base Sepolia
-- Thirdweb can provide broad gas-sponsored x402 settlement
-- Circle Gateway can provide batched gasless nanopayments
-- x402.org or other facilitators can support standard exact settlement
-- OmniClaw self-hosted exact facilitator is available for Arc, custom networks, and self-hosted control
-
-## Validating Deployment Readiness
-
-For any production environment deployment, we recommend verifying:
+For a production canary, capture:
 
 - seller URL
 - `inspect-x402` output
 - `pay` output
 - transaction hash or settlement ID
-- dashboard/explorer screenshot
 - policy file used for the buyer
-
-Ensure this validation checklist is complete before moving to production.
-
-## Buyer Readiness
-
-The buyer path is ready when:
-
-- `omniclaw-cli can-pay` works
-- `omniclaw-cli inspect-x402` reports the selected route
-- `omniclaw-cli pay` uses `/api/v1/pay`
-- policy blocks unsafe recipients before settlement
-- exact x402 payments use the standard x402 SDK path
-- Gateway payments require Gateway readiness before selecting `GatewayWalletBatched`
-
-## Seller Readiness
-
-The seller path is ready when:
-
-- seller advertises correct x402 requirements
-- seller does not leak Gateway metadata into non-Gateway exact flows
-- paid response unlocks only after settlement
-- settlement status is visible in logs and response metadata
-
-## Facilitator Strategy
-
-Recommended facilitator strategy:
-
-- x402.org first for external exact validation on Base Sepolia
-- Thirdweb next for managed external x402 validation once account access is available
-- Circle Gateway for batched nanopayments
-- external exact facilitators where seller requirements support them
-- OmniClaw self-hosted exact facilitator for Arc, custom networks, and self-hosted enterprise deployments
-
-Operational split:
-
-- seller surface creates `accepts`
-- facilitator verifies and settles
-- buyer policy engine decides whether payment is allowed and which route is selected
-
-Keep these layers separate in deployment docs, system design, and product claims.
-
-## Current Supported Capabilities
-
-OmniClaw officially supports:
-
-- Base Sepolia external exact via x402.org: fully supported
-- buyer exact x402 path via `/api/v1/pay`: fully supported
-- seller exact route advertising correct `payTo`: fully supported
-- OmniClaw self-hosted exact facilitator: fully supported on Arc Testnet and EVM profiles
-- Arc exact profile: fully supported with self-hosted facilitator settlement
-- Thirdweb HTTP integration: fully supported for `accepts`, `verify`, `settle`, `fetch`, and discovery; requires managed Thirdweb account configuration
+- dashboard or explorer evidence
 
 ## Release Gate
 
-Run before shipping:
+Run before shipping core changes:
 
 ```bash
 uv sync --extra dev
-uv run pytest \
-  tests/test_setup.py \
-  tests/test_payment_intents.py \
-  tests/test_client.py \
-  tests/test_webhook_verification.py
-
-python3 -m py_compile \
-  src/omniclaw/seller/facilitator_generic.py \
-  examples/thirdweb-http-facilitator/verify_settle.py \
-  src/omniclaw/admin_cli.py \
-  src/omniclaw/facilitator/exact.py \
-  src/omniclaw/facilitator/networks.py \
-  scripts/verify_release_artifact.py
-
+uv run pytest -q
 python3 scripts/release_verify.sh
 ```
 
-If you are validating exact-flow deployment coverage, run the current smoke slice after syncing dependencies:
+Run hosted facilitator checks from its standalone directory:
 
 ```bash
-uv run pytest \
-  tests/test_facilitator_e2e.py \
-  tests/test_cli_facilitator.py \
-  tests/test_cctp_constants.py \
-  tests/test_exact_network_profiles.py \
-  tests/test_exact_facilitator_app.py \
-  tests/test_x402_sdk_adapter.py \
-  -q
+cd services/hosted-facilitator
+uv run --extra dev python -m pytest -q
 ```
-
-This exact-flow slice currently depends on an `x402` build that exposes `x402.schemas`.

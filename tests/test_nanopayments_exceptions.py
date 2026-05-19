@@ -219,7 +219,7 @@ class TestNetworkErrors:
 
 
 class TestMiddlewareErrors:
-    """Tests for GatewayMiddleware errors."""
+    """Tests for compatibility x402 402 errors."""
 
     def test_invalid_price(self):
         exc = InvalidPriceError("not a number")

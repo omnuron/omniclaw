@@ -9,7 +9,6 @@ Set these for production (`OMNICLAW_ENV=production` or `mainnet`):
 ```env
 OMNICLAW_ENV=production
 OMNICLAW_STRICT_SETTLEMENT=true
-OMNICLAW_SELLER_NONCE_REDIS_URL=redis://localhost:6379/1
 OMNICLAW_WEBHOOK_VERIFICATION_KEY=your_public_key
 OMNICLAW_WEBHOOK_DEDUP_DB_PATH=/var/lib/omniclaw/webhook_dedup.sqlite3
 ```
@@ -36,28 +35,28 @@ OMNICLAW_WEBHOOK_MAX_FUTURE_SKEW_SECONDS=300
 OMNICLAW_WEBHOOK_DEDUP_ENABLED=true
 ```
 
-## Nonce Replay Protection
+## Product Boundary
 
-Production seller flows must use distributed nonce storage:
+This document covers OmniClaw core. Seller project APIs, facilitator settlement, nonce replay protection for seller middleware, control-plane auth, and reconciliation are part of the standalone hosted facilitator service:
 
-- `OMNICLAW_SELLER_NONCE_REDIS_URL` points to Redis.
-- in-memory nonce replay protection is not accepted in production mode.
+```bash
+services/hosted-facilitator/
+```
 
 ## Settlement Semantics
 
 - `OMNICLAW_STRICT_SETTLEMENT=true` ensures success reflects irreversible settlement states.
 - Do not disable strict settlement in production.
 
-## Facilitator Strategy
+## External Facilitator Strategy
 
-OmniClaw is facilitator-agnostic. Production deployments should choose the settlement provider that fits the seller and network:
+OmniClaw core is facilitator-aware as a buyer. Production buyer deployments should inspect what the seller advertises and route only through a buyer-supported payment method:
 
-- Thirdweb-backed x402 facilitator for managed gas-sponsored exact settlement across broad EVM coverage
 - Circle Gateway `GatewayWalletBatched` for gasless batched nanopayments
-- external standard x402 facilitator where the seller already uses one
-- self-hosted OmniClaw exact facilitator when local proof, custom network support, or enterprise self-hosting is required
+- standard x402 `exact` where the seller and facilitator advertise compatible requirements
+- external facilitator URLs selected by the seller
 
-Use a self-hosted facilitator when it fits the network and operational model. Use a managed facilitator when it already cleanly supports the target flow.
+Operate OmniClaw-hosted settlement from `services/hosted-facilitator`, not from the core package.
 
 Before production traffic, validate the exact seller path with:
 
@@ -66,7 +65,7 @@ omniclaw-cli inspect-x402 --recipient https://seller.example.com/compute
 omniclaw-cli pay --recipient https://seller.example.com/compute --idempotency-key production-canary-001
 ```
 
-For Thirdweb validation, use `examples/thirdweb-http-facilitator/README.md`.
+For hosted facilitator validation, use `services/hosted-facilitator/docs/` plus the external seller and buyer examples under root `examples/hosted_facilitator_*`.
 
 ## Canary and SLA
 

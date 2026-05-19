@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   redis:
     image: redis:7-alpine
@@ -14,16 +12,14 @@ services:
       timeout: 3s
       retries: 5
 
-  omniclaw-ops-api:
+  omniclaw-agent:
     build: .
-    command: uvicorn omniclaw.ops.api:app --host 0.0.0.0 --port 8088 --reload
+    command: uvicorn omniclaw.agent.server:app --host 0.0.0.0 --port 8080 --reload
     environment:
       - OMNICLAW_REDIS_URL=redis://redis:6379/0
-      - OMNICLAW_OPS_API_KEY=${OMNICLAW_OPS_API_KEY:-}
-      - OMNICLAW_OPS_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
       - OMNICLAW_EVENTS_ENABLED=true
     ports:
-      - "8088:8088"
+      - "8080:8080"
     depends_on:
       redis:
         condition: service_healthy

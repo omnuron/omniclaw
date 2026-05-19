@@ -87,6 +87,53 @@ def _is_success_status(status_code: int) -> bool:
     return status_code in _SUCCESS_STATUS_CODES
 
 
+def _find_raw_gateway_kind(payment_required: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the unmodified Gateway accept object advertised by the seller."""
+    accepts = payment_required.get("accepts")
+    if not isinstance(accepts, list):
+        return None
+    for accept in accepts:
+        if not isinstance(accept, dict):
+            continue
+        extra = accept.get("extra")
+        if isinstance(extra, dict) and extra.get("name") == "GatewayWalletBatched":
+            return dict(accept)
+    return None
+
+
+def _with_gateway_verifying_contract(
+    accepted: dict[str, Any],
+    verifying_contract: str,
+) -> dict[str, Any]:
+    """Preserve seller-advertised Gateway metadata while filling the contract if absent."""
+    result = dict(accepted)
+    extra = dict(result.get("extra") or {})
+    if verifying_contract and not extra.get("verifyingContract"):
+        extra["verifyingContract"] = verifying_contract
+    result["extra"] = extra
+    return result
+
+
+def _gateway_valid_before(accepted: dict[str, Any]) -> int:
+    extra = accepted.get("extra") if isinstance(accepted.get("extra"), dict) else {}
+    min_validity = _positive_int(extra.get("minValiditySeconds"))
+    max_timeout = _positive_int(accepted.get("maxTimeoutSeconds"))
+    window = max(min_validity or 0, 345600)
+    if min_validity:
+        window = min_validity + 60
+    if max_timeout:
+        window = min(window, max_timeout)
+    return int(time.time()) + window
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 # =============================================================================
 # CIRCUIT BREAKER
 # =============================================================================
@@ -303,6 +350,7 @@ class NanopaymentAdapter:
         requirements: PaymentRequirementsKind,
         resource: ResourceInfoType | None = None,
         amount_atomic: int | None = None,
+        valid_before: int | None = None,
     ) -> PaymentPayload:
         """Sign a payment using the EIP-3009 signer."""
         if amount_atomic is None:
@@ -310,6 +358,7 @@ class NanopaymentAdapter:
         payload = self._signer.sign_transfer_with_authorization(
             requirements=requirements,
             amount_atomic=amount_atomic,
+            valid_before=valid_before,
         )
         # Attach resource info if provided
         if resource is not None:
@@ -325,7 +374,7 @@ class NanopaymentAdapter:
     @staticmethod
     def _encode_payment_signature_header(
         payload: PaymentPayload,
-        accepted: PaymentRequirementsKind,
+        accepted: PaymentRequirementsKind | dict[str, Any],
     ) -> str:
         """
         Encode the x402 v2 payment header sent back to the seller.
@@ -336,7 +385,9 @@ class NanopaymentAdapter:
         accepting the paid retry.
         """
         payment_payload = payload.to_dict()
-        payment_payload["accepted"] = accepted.to_dict()
+        payment_payload["accepted"] = (
+            accepted.to_dict() if hasattr(accepted, "to_dict") else dict(accepted)
+        )
         return base64.b64encode(json.dumps(payment_payload).encode("utf-8")).decode("ascii")
 
     # -------------------------------------------------------------------------
@@ -411,7 +462,7 @@ class NanopaymentAdapter:
         # Step 2: Not a payment response
         if initial_resp.status_code != 402:
             return NanopaymentResult(
-                success=True,
+                success=_is_success_status(initial_resp.status_code),
                 payer="",
                 seller="",
                 transaction="",
@@ -477,6 +528,7 @@ class NanopaymentAdapter:
             raise UnsupportedSchemeError(
                 scheme=str([k.extra.name for k in requirements.accepts]),
             )
+        raw_gateway_kind = _find_raw_gateway_kind(req_data) or gateway_kind.to_dict()
 
         # Step 5: Get verifying contract if missing
         verifying_contract = gateway_kind.extra.verifying_contract
@@ -484,6 +536,7 @@ class NanopaymentAdapter:
             verifying_contract = await self._client.get_verifying_contract(
                 gateway_kind.network,
             )
+        raw_gateway_kind = _with_gateway_verifying_contract(raw_gateway_kind, verifying_contract)
 
         # Build updated requirements with verifying contract
         from omniclaw.protocols.nanopayments.types import (
@@ -522,12 +575,13 @@ class NanopaymentAdapter:
         payload = self._sign(
             requirements=updated_kind,
             resource=resource,
+            valid_before=_gateway_valid_before(raw_gateway_kind),
         )
 
         # Step 8: Retry with payment header
         payment_sig_header = self._encode_payment_signature_header(
             payload=payload,
-            accepted=updated_kind,
+            accepted=raw_gateway_kind,
         )
 
         retry_headers = dict(headers)

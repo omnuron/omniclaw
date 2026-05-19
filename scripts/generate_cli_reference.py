@@ -22,7 +22,6 @@ COMMANDS = [
     ("omniclaw-cli withdraw --help", ["omniclaw-cli", "withdraw", "--help"]),
     ("omniclaw-cli withdraw-trustless --help", ["omniclaw-cli", "withdraw-trustless", "--help"]),
     ("omniclaw-cli withdraw-trustless-complete --help", ["omniclaw-cli", "withdraw-trustless-complete", "--help"]),
-    ("omniclaw-cli serve --help", ["omniclaw-cli", "serve", "--help"]),
     ("omniclaw-cli create-intent --help", ["omniclaw-cli", "create-intent", "--help"]),
     ("omniclaw-cli confirm-intent --help", ["omniclaw-cli", "confirm-intent", "--help"]),
     ("omniclaw-cli get-intent --help", ["omniclaw-cli", "get-intent", "--help"]),
@@ -69,12 +68,12 @@ python3 scripts/generate_cli_reference.py
 
 ## Usage Notes
 
-- same CLI, two roles: buyer uses `pay`, seller uses `serve`
+- core CLI is buyer-side: use `pay`, `inspect-x402`, and policy checks before money moves
 - use `can-pay` before a new recipient when policy allow/deny matters
 - use `balance-detail` when Gateway state matters
 - use `--idempotency-key` for job-based payments
 - for x402 URLs, `--amount` can be omitted because the payment requirements come from the seller endpoint
-- `serve` binds to `0.0.0.0` even if the banner prints `localhost`
+- hosted seller/facilitator operations live under `services/hosted-facilitator`
 
 ## Example Flows
 
@@ -93,16 +92,6 @@ omniclaw-cli pay \\
   --amount 5.00 \\
   --purpose "service payment" \\
   --idempotency-key job-123
-```
-
-Seller exposing a paid endpoint:
-
-```bash
-omniclaw-cli serve \\
-  --price 0.01 \\
-  --endpoint /api/data \\
-  --exec "python app.py" \\
-  --port 8000
 ```
 
 ## Live Help Output

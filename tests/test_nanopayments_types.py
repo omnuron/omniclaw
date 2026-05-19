@@ -9,7 +9,6 @@ from omniclaw.protocols.nanopayments import (
     EIP3009Authorization,
     GatewayBalance,
     NanopaymentResult,
-    PaymentInfo,
     PaymentPayload,
     PaymentPayloadInner,
     PaymentRequirements,
@@ -447,33 +446,6 @@ class TestNanopaymentResult:
             response_data=None,
         )
         assert result.response_data is None
-
-
-class TestPaymentInfo:
-    """Tests for PaymentInfo."""
-
-    def test_amount_decimal_conversion(self):
-        info = PaymentInfo(
-            verified=True,
-            payer="0xBuyer123",
-            amount="1000000",  # 1 USDC
-            network="eip155:5042002",
-            transaction="batch-ref-123",
-        )
-        assert info.amount_decimal == "1"
-
-    def test_to_dict(self):
-        info = PaymentInfo(
-            verified=True,
-            payer="0xBuyer123",
-            amount="1000000",
-            network="eip155:5042002",
-            transaction="batch-ref-123",
-        )
-        d = info.to_dict()
-        assert d["verified"] is True
-        assert d["payer"] == "0xBuyer123"
-        assert d["amount_decimal"] == "1"
 
 
 class TestDepositResult:

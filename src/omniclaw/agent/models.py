@@ -204,19 +204,3 @@ class X402InspectResponse(BaseModel):
     selected_amount_usdc: str | None = None
     selected_pay_to: str | None = None
     seller_accepts: list[dict[str, Any]] = Field(default_factory=list)
-
-
-class X402VerifyRequest(BaseModel):
-    """X402 Verification request."""
-
-    signature: str = Field(..., description="Payment signature/proof")
-    amount: str = Field(..., description="Amount paid")
-    sender: str = Field(..., description="Sender address")
-    resource: str = Field(..., description="Resource URL")
-
-
-class X402RequirementsRequest(BaseModel):
-    """X402 requirements request for seller-side paid endpoints."""
-
-    amount: str = Field(..., description="Price in USD or atomic units")
-    resource: str = Field(..., description="Protected resource URL")

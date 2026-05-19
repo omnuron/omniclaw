@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextvars
 import ipaddress
 import os
 import re
@@ -60,12 +59,10 @@ from omniclaw.protocols.gateway import GatewayAdapter
 from omniclaw.protocols.nanopayments import (
     DepositResult,
     GatewayBalance,
-    GatewayMiddleware,
     NanopaymentAdapter,
     NanopaymentClient,
     NanopaymentNotInitializedError,
     NanopaymentProtocolAdapter,
-    PaymentInfo,
     WithdrawResult,
 )
 from omniclaw.protocols.transfer import TransferAdapter
@@ -76,11 +73,6 @@ from omniclaw.storage import get_storage
 from omniclaw.trust.gate import TrustGate
 from omniclaw.wallet.service import WalletService
 from omniclaw.webhooks import WebhookParser
-
-_current_payment_info: contextvars.ContextVar[PaymentInfo | None] = contextvars.ContextVar(
-    "_current_payment_info", default=None
-)
-
 
 class OmniClaw:
     """
@@ -191,8 +183,6 @@ class OmniClaw:
         self._nano_client: NanopaymentClient | None = None
         self._nano_adapter: NanopaymentAdapter | None = None
         self._nano_http: httpx.AsyncClient | None = None
-        self._gateway_middleware: GatewayMiddleware | None = None
-        self._gateway_default_address: str | None = None
         if self._config.nanopayments_enabled:
             self._init_nanopayments()
 
@@ -246,7 +236,6 @@ class OmniClaw:
             return
 
         required_env = [
-            "OMNICLAW_SELLER_NONCE_REDIS_URL",
             "OMNICLAW_WEBHOOK_VERIFICATION_KEY",
             "OMNICLAW_WEBHOOK_DEDUP_DB_PATH",
         ]
@@ -388,173 +377,6 @@ class OmniClaw:
         Returns None if nanopayments are not initialized.
         """
         return self._nano_adapter
-
-    async def gateway(
-        self,
-        seller_address: str | None = None,
-        facilitator: str | None = None,
-    ) -> GatewayMiddleware:
-        """
-        Get the GatewayMiddleware for protecting seller endpoints with x402 payments.
-
-        Usage (FastAPI):
-            from fastapi import Depends
-
-            app = FastAPI()
-
-            @app.get("/premium")
-            async def premium(payment=Depends(omniclaw.gateway().require("$0.001"))):
-                return {"data": "paid content", "paid_by": payment.payer}
-
-        Args:
-            seller_address: The address that receives payments.
-                - For Circle Gateway: uses your wallet's nano address
-                - For other facilitators: any EVM address you control
-            facilitator: Choose which facilitator to use:
-                - "circle" (default): Circle Gateway (needs wallet)
-                - "coinbase": Coinbase CDP
-                - "ordern": OrderN
-                - "rbx": RBX
-                - "thirdweb": Thirdweb
-                - "omniclaw": OmniClaw self-hosted exact facilitator
-
-        Raises:
-            NanopaymentNotInitializedError: If nanopayments are disabled and facilitator is Circle.
-        """
-        # Return cached middleware if available and no overrides specified
-        if self._gateway_middleware is not None and seller_address is None and facilitator is None:
-            return self._gateway_middleware
-
-        # For Circle, we need nanopayments initialized
-        if (facilitator is None or facilitator == "circle") and (
-            not self._nano_client or not self._nano_adapter
-        ):
-            raise NanopaymentNotInitializedError()
-
-        # If no seller_address provided, try to get from wallet
-        if not seller_address:
-            if self._nano_adapter:
-                # Direct private key mode: use adapter address
-                seller_address = self._nano_adapter.address
-            if not seller_address:
-                raise ValueError(
-                    "seller_address is required. "
-                    "Provide your payment address, or create a wallet first."
-                )
-
-        # Create facilitator if not Circle
-        facilitator_client = None
-        if facilitator and facilitator != "circle":
-            from omniclaw.seller.facilitator_generic import create_facilitator
-
-            facilitator_client = create_facilitator(
-                provider=facilitator,
-                environment=self._config.nanopayments_environment,
-            )
-
-        from omniclaw.protocols.nanopayments.middleware import GatewayMiddleware
-
-        # For Circle, we need the nanopayment client
-        if facilitator_client is None and self._nano_client:
-            client_to_use = self._nano_client
-        else:
-            client_to_use = None
-
-        self._gateway_middleware = GatewayMiddleware(
-            seller_address=seller_address,
-            nanopayment_client=client_to_use,
-            facilitator=facilitator_client,
-        )
-
-        return self._gateway_middleware
-
-    def sell(
-        self,
-        price: str,
-        seller_address: str | None = None,
-        facilitator: str | None = None,
-    ) -> Any:
-        """
-        Decorator factory for marking a FastAPI route as a paid endpoint.
-
-        Returns a FastAPI Depends() that gates the route with x402 payment.
-
-        Usage:
-            from fastapi import FastAPI
-
-            @app.get("/premium")
-            async def premium(payment=omniclaw.sell("$0.001")):
-                payment_info = omniclaw.current_payment()
-                return {"data": "paid content", "paid_by": payment_info.payer}
-
-        Args:
-            price: Price in USD string (e.g. "$0.001", "1.00").
-            seller_address: Your payment address.
-                - For Circle Gateway: your wallet's nano address
-                - For other facilitators: any EVM address you control
-            facilitator: Choose which facilitator:
-                - "circle" (default): Circle Gateway (needs wallet)
-                - "coinbase": Coinbase CDP
-                - "ordern": OrderN
-                - "rbx": RBX
-                - "thirdweb": Thirdweb
-                - "omniclaw": OmniClaw self-hosted exact facilitator
-
-        Returns:
-            A FastAPI Depends() callable.
-
-        Examples:
-            # Circle Gateway (needs wallet)
-            client.sell("$0.01")
-            client.sell("$0.01", seller_address="0xYourNanoAddress")
-
-            # Other facilitators (just provide your address)
-            client.sell("$0.01", facilitator="coinbase")
-            client.sell("$0.01", seller_address="0xYourAddress", facilitator="coinbase")
-            client.sell("$0.01", seller_address="0xYourAddress", facilitator="omniclaw")
-        """
-        from fastapi import Depends, Request
-
-        def base_dependency_factory():
-            return self.gateway(
-                seller_address=seller_address,
-                facilitator=facilitator,
-            )
-
-        price_str = price
-
-        async def wrapper(request: Request) -> PaymentInfo:
-            gateway_mw = await base_dependency_factory()
-            base_dep = gateway_mw.require(price_str)
-            payment_info: PaymentInfo = await base_dep(request)
-            _current_payment_info.set(payment_info)
-            return payment_info
-
-        return Depends(wrapper)
-
-    def current_payment(self) -> PaymentInfo:
-        """
-        Get the current payment within a @sell() decorated function.
-
-        Returns the PaymentInfo for the in-progress payment, including
-        the payer's address, amount, network, and settlement transaction.
-
-        Usage:
-            @agent.sell(price="$0.001")
-            async def get_data():
-                payment = agent.current_payment()
-                return {"data": "...", "paid_by": payment.payer}
-
-        Returns:
-            PaymentInfo for the current request.
-
-        Raises:
-            ValueError: If called outside of a @sell() decorated function.
-        """
-        info: PaymentInfo | None = _current_payment_info.get()
-        if info is None:
-            raise ValueError("current_payment() called outside of a @sell() decorated function")
-        return info
 
     # -------------------------------------------------------------------------
     # Gateway Wallet management (on-chain deposit/withdraw)

@@ -182,7 +182,7 @@ Claim:
 
 Code / Docs:
 - whitepaper v1 discussion
-- seller-side nonce handling in `src/omniclaw/seller/seller.py`
+- hosted facilitator replay handling in `services/hosted-facilitator/src/hosted_facilitator/`
 
 Evidence Type:
 - implementation hook

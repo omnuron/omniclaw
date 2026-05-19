@@ -502,7 +502,7 @@ class InsufficientGasError(GatewayWalletError):
 
 
 class MiddlewareError(NanopaymentError):
-    """Base for GatewayMiddleware errors."""
+    """Base for x402 seller-gate errors kept for compatibility."""
 
     pass
 
@@ -522,9 +522,6 @@ class InvalidPriceError(MiddlewareError):
 class PaymentRequiredError(MiddlewareError):
     """
     Raised when a payment is required but not provided.
-
-    This is used internally by GatewayMiddleware to trigger
-    the 402 response.
     """
 
     def __init__(self, requirements_body: dict[str, Any]) -> None:

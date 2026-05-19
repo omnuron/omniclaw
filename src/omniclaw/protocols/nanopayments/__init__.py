@@ -8,17 +8,11 @@ Architecture:
     - EIP3009Signer: Cryptographic signing of payment authorizations
     - NanopaymentClient: Circle Gateway REST API wrapper
     - NanopaymentAdapter: Buyer-side payment execution
-    - GatewayMiddleware: Seller-side x402 payment gate
     - GatewayWalletManager: On-chain deposit/withdraw operations
 
 Usage:
     Buyer side:
         result = await nanopayment_adapter.pay_x402_url(url="https://api.provider.com/data")
-
-    Seller side:
-        @app.get("/premium")
-        async def premium(payment=Depends(gateway.require("$0.001"))):
-            return {"data": "paid content", "paid_by": payment.payer}
 """
 
 from omniclaw.protocols.nanopayments.constants import (
@@ -86,7 +80,6 @@ from omniclaw.protocols.nanopayments.types import (
     EIP3009Authorization,
     GatewayBalance,
     NanopaymentResult,
-    PaymentInfo,
     PaymentPayload,
     PaymentPayloadInner,
     PaymentRequirements,
@@ -104,12 +97,6 @@ from omniclaw.protocols.nanopayments.client import (
 )
 
 from omniclaw.protocols.nanopayments.wallet import GatewayWalletManager
-
-from omniclaw.protocols.nanopayments.middleware import (
-    GatewayMiddleware,
-    PaymentRequiredHTTPError,
-    parse_price,
-)
 
 from omniclaw.protocols.nanopayments.adapter import (
     NanopaymentAdapter,
@@ -145,7 +132,6 @@ __all__ = [
     "EIP3009Authorization",
     "GatewayBalance",
     "NanopaymentResult",
-    "PaymentInfo",
     "PaymentPayload",
     "PaymentPayloadInner",
     "PaymentRequirements",
@@ -162,10 +148,6 @@ __all__ = [
     "GatewayWalletManager",
     # Adapter
     "NanopaymentAdapter",
-    # Middleware
-    "GatewayMiddleware",
-    "PaymentRequiredHTTPError",
-    "parse_price",
     # Adapter wrapper
     "NanopaymentProtocolAdapter",
     # Exceptions
