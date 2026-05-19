@@ -74,6 +74,7 @@ from omniclaw.trust.gate import TrustGate
 from omniclaw.wallet.service import WalletService
 from omniclaw.webhooks import WebhookParser
 
+
 class OmniClaw:
     """
     Main client for OmniClaw SDK.

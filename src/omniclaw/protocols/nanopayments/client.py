@@ -767,7 +767,7 @@ class NanopaymentClient:
             "token": "USDC",
             "sources": [
                 {
-                    "domain": domain_id,
+                    "domain": expected_domain,
                     "depositor": address,
                 }
             ],
