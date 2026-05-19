@@ -987,7 +987,7 @@ class X402Adapter(ProtocolAdapter):
                 result["reason"] = (
                     "Buyer can create a valid x402 payment payload. "
                     "Direct wallet balance check was skipped; execution still depends on "
-                    "seller-side settlement and on-chain balance."
+                    "the remote payment handler and on-chain balance."
                 )
 
         except Exception as e:
