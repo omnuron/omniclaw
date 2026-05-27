@@ -19,8 +19,7 @@
       },
       "rails": {
         "circle_transfer": true,
-        "x402_exact": true,
-        "gateway": true
+        "x402": true
       }
     }
   }

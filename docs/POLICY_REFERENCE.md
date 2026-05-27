@@ -34,8 +34,7 @@ Hot reload:
       },
       "rails": {
         "circle_transfer": true,
-        "x402_exact": true,
-        "gateway": true
+        "x402": true
       }
     }
   }
@@ -73,8 +72,7 @@ Hot reload:
       },
       "rails": {
         "circle_transfer": true,
-        "x402_exact": true,
-        "gateway": true
+        "x402": true
       },
       "confirm_threshold": "50.00"
     }
@@ -148,8 +146,7 @@ Hot reload:
 | Field | Type | Description |
 |-------|------|-------------|
 | `circle_transfer` | boolean | Allow direct Circle Developer Wallet transfers |
-| `gateway` | boolean | Allow Circle Gateway routes |
-| `x402_exact` | boolean | Allow direct x402 exact payments signed by `OMNICLAW_PRIVATE_KEY` |
+| `x402` | boolean | Allow paid API payments. OmniClaw chooses Gateway nanopayment or the standard x402 payment path internally based on seller accepts, buyer config, and Gateway balance. |
 
 Generated Circle wallet IDs and EOA addresses are stored in `OMNICLAW_AGENT_STATE_PATH`, not in `policy.json`. Keep policy files stable and reviewable.
 

@@ -43,8 +43,10 @@ class RailsModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     circle_transfer: bool = True
-    x402_exact: bool = True
-    gateway: bool = True
+    x402: bool | None = None
+    # Deprecated compatibility fields accepted for older policy files.
+    x402_exact: bool | None = None
+    gateway: bool | None = None
 
 
 class TokenConfigModel(BaseModel):

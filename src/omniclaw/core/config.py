@@ -21,6 +21,15 @@ def _get_env_var(name: str, default: str | None = None, required: bool = False) 
     return value
 
 
+def _parse_bool(value: Any) -> bool:
+    """Parse boolean-like config values from env strings or direct overrides."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Config:
     """SDK configuration."""
@@ -101,20 +110,24 @@ class Config:
     auto_reconcile_pending_settlements: bool = False
     """If true, opportunistically reconcile pending settlements during payment operations."""
 
+    @property
+    def enable_x402(self) -> bool:
+        """Return whether any x402 execution path is enabled."""
+        return self.enable_gateway or self.enable_x402_exact
+
     def __post_init__(self) -> None:
         mode = self.buyer_mode.strip().lower()
         if mode not in {"hybrid", "circle", "gateway", "x402"}:
-            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, gateway, x402")
+            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, x402")
         if (self.enable_circle_transfer or self.enable_gateway) and not self.circle_api_key:
             raise ValueError(
-                "CIRCLE_API_KEY is required when Circle transfers or Gateway payments are enabled"
+                "CIRCLE_API_KEY is required when Circle direct transfers or x402 Gateway "
+                "nanopayments are enabled"
             )
         if self.enable_circle_transfer and not self.entity_secret:
             raise ValueError("ENTITY_SECRET is required when Circle transfer rail is enabled")
         if (self.enable_gateway or self.enable_x402_exact) and not self.nanopayments_private_key:
-            raise ValueError(
-                "OMNICLAW_PRIVATE_KEY is required when Gateway or x402 exact payments are enabled"
-            )
+            raise ValueError("OMNICLAW_PRIVATE_KEY is required when x402 payments are enabled")
         if not self.entity_secret and not self.nanopayments_private_key:
             import logging
 
@@ -150,7 +163,9 @@ class Config:
 
         env = override_or_env("env", "OMNICLAW_ENV", "development")
         rpc_url = override_or_env("rpc_url", "OMNICLAW_RPC_URL")
-        buyer_mode = str(override_or_env("buyer_mode", "OMNICLAW_BUYER_MODE", "circle")).lower()
+        buyer_mode = (
+            str(override_or_env("buyer_mode", "OMNICLAW_BUYER_MODE", "circle")).strip().lower()
+        )
 
         mode_defaults = {
             "hybrid": {
@@ -163,6 +178,7 @@ class Config:
                 "enable_gateway": False,
                 "enable_x402_exact": False,
             },
+            # Legacy alias kept for existing deployments; public docs use x402.
             "gateway": {
                 "enable_circle_transfer": False,
                 "enable_gateway": True,
@@ -170,27 +186,43 @@ class Config:
             },
             "x402": {
                 "enable_circle_transfer": False,
-                "enable_gateway": False,
+                "enable_gateway": bool(circle_api_key),
                 "enable_x402_exact": True,
             },
         }
         defaults = mode_defaults.get(buyer_mode)
         if defaults is None:
-            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, gateway, x402")
+            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, x402")
 
         def rail_flag(name: str, env_name: str) -> bool:
             if name in overrides:
-                return bool(overrides[name])
+                return _parse_bool(overrides[name])
             env_value = _get_env_var(env_name)
             if env_value is None:
                 return bool(defaults[name])
-            return str(env_value).strip().lower() in {"1", "true", "yes", "on"}
+            return _parse_bool(env_value)
 
         enable_circle_transfer = rail_flag(
             "enable_circle_transfer", "OMNICLAW_ENABLE_CIRCLE_TRANSFER"
         )
         enable_gateway = rail_flag("enable_gateway", "OMNICLAW_ENABLE_GATEWAY")
         enable_x402_exact = rail_flag("enable_x402_exact", "OMNICLAW_ENABLE_X402_EXACT")
+        x402_env_value = _get_env_var("OMNICLAW_ENABLE_X402")
+        if "enable_x402" in overrides:
+            enable_x402 = _parse_bool(overrides["enable_x402"])
+            enable_x402_exact = enable_x402
+            enable_gateway = enable_x402 and bool(circle_api_key)
+        elif x402_env_value is not None:
+            enable_x402 = _parse_bool(x402_env_value)
+            enable_x402_exact = enable_x402
+            enable_gateway = enable_x402 and bool(circle_api_key)
+        if "enable_gateway" in overrides or _get_env_var("OMNICLAW_ENABLE_GATEWAY") is not None:
+            enable_gateway = rail_flag("enable_gateway", "OMNICLAW_ENABLE_GATEWAY")
+        if (
+            "enable_x402_exact" in overrides
+            or _get_env_var("OMNICLAW_ENABLE_X402_EXACT") is not None
+        ):
+            enable_x402_exact = rail_flag("enable_x402_exact", "OMNICLAW_ENABLE_X402_EXACT")
 
         storage_backend = override_or_env("storage_backend", "OMNICLAW_STORAGE_BACKEND", "memory")
         redis_url = override_or_env("redis_url", "OMNICLAW_REDIS_URL")

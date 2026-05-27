@@ -304,25 +304,59 @@ class RailConfig:
     """Enabled buyer payment rails for a policy wallet/profile."""
 
     circle_transfer: bool = True
-    x402_exact: bool = True
-    gateway: bool = True
+    x402: bool = True
+    x402_explicit: bool = False
+    legacy_gateway: bool | None = None
+    legacy_x402_exact: bool | None = None
 
     @classmethod
     def from_dict(cls, data: dict | None) -> RailConfig:
         if not data:
             return cls()
+        x402_explicit = data.get("x402") is not None
+        x402 = data.get("x402")
+        legacy_gateway = data.get("gateway") if "gateway" in data else None
+        legacy_x402_exact = data.get("x402_exact") if "x402_exact" in data else None
+        if x402 is None:
+            legacy_values = [
+                value for value in (legacy_x402_exact, legacy_gateway) if value is not None
+            ]
+            x402 = any(bool(value) for value in legacy_values) if legacy_values else True
         return cls(
             circle_transfer=bool(data.get("circle_transfer", True)),
-            x402_exact=bool(data.get("x402_exact", True)),
-            gateway=bool(data.get("gateway", True)),
+            x402=bool(x402),
+            x402_explicit=x402_explicit,
+            legacy_gateway=None if legacy_gateway is None else bool(legacy_gateway),
+            legacy_x402_exact=None if legacy_x402_exact is None else bool(legacy_x402_exact),
         )
 
     def to_dict(self) -> dict[str, bool]:
         return {
             "circle_transfer": self.circle_transfer,
-            "x402_exact": self.x402_exact,
-            "gateway": self.gateway,
+            "x402": self.x402,
         }
+
+    def is_x402_route_enabled(self, selected_route: object) -> bool:
+        if not self.x402:
+            return False
+        if self.x402_explicit:
+            return True
+        route = str(selected_route or "").strip().lower()
+        if route == "nanopayment" and self.legacy_gateway is not None:
+            return self.legacy_gateway
+        if route == "x402" and self.legacy_x402_exact is not None:
+            return self.legacy_x402_exact
+        return True
+
+
+def _normalize_wallets(wallets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for alias, config in wallets.items():
+        next_config = dict(config)
+        if isinstance(next_config.get("rails"), dict):
+            next_config["rails"] = RailConfig.from_dict(next_config.get("rails")).to_dict()
+        normalized[alias] = next_config
+    return normalized
 
 
 @dataclass
@@ -342,7 +376,7 @@ class Policy:
         result = {
             "version": self.version,
             "tokens": self.tokens,
-            "wallets": self.wallets,
+            "wallets": _normalize_wallets(self.wallets),
         }
 
         if self.limits and any(
@@ -494,8 +528,7 @@ class PolicyManager:
                         "recipients": {"mode": "allow_all"},
                         "rails": {
                             "circle_transfer": True,
-                            "x402_exact": True,
-                            "gateway": True,
+                            "x402": True,
                         },
                     }
                 },
@@ -697,11 +730,12 @@ class PolicyManager:
         rails = self.rail_config(wallet_id)
         if rail == "circle_transfer":
             return rails.circle_transfer
-        if rail == "x402_exact":
-            return rails.x402_exact
-        if rail == "gateway":
-            return rails.gateway
+        if rail in {"x402", "x402_exact", "gateway"}:
+            return rails.x402
         return False
+
+    def is_x402_route_enabled(self, selected_route: object, wallet_id: str | None = None) -> bool:
+        return self.rail_config(wallet_id).is_x402_route_enabled(selected_route)
 
 
 class WalletManager:
@@ -768,7 +802,12 @@ class WalletManager:
             circle_enabled = bool(getattr(self._client.config, "enable_circle_transfer", True))
             if not circle_enabled:
                 synthetic_prefix = (
-                    "gateway" if getattr(self._client.config, "enable_gateway", False) else "eoa"
+                    "x402"
+                    if (
+                        getattr(self._client.config, "enable_gateway", False)
+                        or getattr(self._client.config, "enable_x402_exact", False)
+                    )
+                    else "eoa"
                 )
                 synthetic_id = (
                     wallet_id or runtime_cfg.get("wallet_id") or f"{synthetic_prefix}:{alias}"

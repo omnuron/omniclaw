@@ -11,9 +11,9 @@ import pytest
 from fastapi import HTTPException
 
 from omniclaw.agent.auth import AuthenticatedAgent
-from omniclaw.agent.models import CanPayResponse, PayRequest, SimulateRequest
+from omniclaw.agent.models import CanPayResponse, CreateIntentRequest, PayRequest, SimulateRequest
 from omniclaw.agent.policy import PolicyManager, RuntimeWalletState, WalletManager
-from omniclaw.agent.routes import can_pay, confirm_intent, get_address, pay, simulate
+from omniclaw.agent.routes import can_pay, confirm_intent, create_intent, get_address, pay, simulate
 from omniclaw.core.types import Network, PaymentMethod
 
 
@@ -25,6 +25,8 @@ class _FakeClient:
     def __init__(self, *, circle_transfer: bool = True, eoa_address: str = "0x" + "2" * 40):
         self.config = SimpleNamespace(
             enable_circle_transfer=circle_transfer,
+            enable_gateway=False,
+            enable_x402_exact=True,
             network=Network.BASE_SEPOLIA,
         )
         self._config = self.config
@@ -69,8 +71,7 @@ async def test_wallet_initialization_writes_runtime_state_not_policy(tmp_path):
                     "recipients": {"mode": "allow_all"},
                     "rails": {
                         "circle_transfer": True,
-                        "x402_exact": True,
-                        "gateway": True,
+                        "x402": True,
                     },
                 }
             },
@@ -109,8 +110,7 @@ async def test_x402_only_wallet_initialization_does_not_require_circle_wallet(tm
                     "name": "Primary",
                     "rails": {
                         "circle_transfer": False,
-                        "x402_exact": True,
-                        "gateway": False,
+                        "x402": True,
                     },
                 }
             },
@@ -128,13 +128,114 @@ async def test_x402_only_wallet_initialization_does_not_require_circle_wallet(tm
 
     result = await wallet_manager.initialize_wallets()
 
-    assert result == {"agent-token": "eoa:primary"}
+    assert result == {"agent-token": "x402:primary"}
     client.create_agent_wallet.assert_not_called()
     state_after = json.loads(state_path.read_text())
-    assert state_after["wallets"]["primary"]["wallet_id"] == "eoa:primary"
+    assert state_after["wallets"]["primary"]["wallet_id"] == "x402:primary"
     assert state_after["wallets"]["primary"]["circle_wallet_id"] is None
     assert state_after["wallets"]["primary"]["circle_wallet_address"] is None
     assert state_after["wallets"]["primary"]["gateway_eoa_address"] == "0x" + "3" * 40
+
+
+@pytest.mark.asyncio
+async def test_legacy_gateway_and_exact_rails_normalize_to_x402(tmp_path):
+    policy_path = tmp_path / "policy.json"
+    _write_policy(
+        policy_path,
+        {
+            "version": "2.0",
+            "tokens": {"agent-token": {"wallet_alias": "primary", "active": True}},
+            "wallets": {
+                "primary": {
+                    "name": "Primary",
+                    "rails": {
+                        "circle_transfer": True,
+                        "gateway": False,
+                        "x402_exact": True,
+                    },
+                }
+            },
+        },
+    )
+
+    manager = PolicyManager(str(policy_path))
+    await manager.load()
+    manager.set_mapping("agent-token", "wallet-1", manager.get_wallet_map()["primary"])
+
+    assert manager.is_rail_enabled("x402", "wallet-1") is True
+    assert manager.is_rail_enabled("gateway", "wallet-1") is True
+    assert manager.is_rail_enabled("x402_exact", "wallet-1") is True
+    assert manager.is_x402_route_enabled("nanopayment", "wallet-1") is False
+    assert manager.is_x402_route_enabled("x402", "wallet-1") is True
+    assert manager.get_policy().to_dict()["wallets"]["primary"]["rails"] == {
+        "circle_transfer": True,
+        "x402": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_legacy_false_x402_rails_disable_public_x402(tmp_path):
+    policy_path = tmp_path / "policy.json"
+    _write_policy(
+        policy_path,
+        {
+            "version": "2.0",
+            "tokens": {"agent-token": {"wallet_alias": "primary", "active": True}},
+            "wallets": {
+                "primary": {
+                    "name": "Primary",
+                    "rails": {
+                        "circle_transfer": True,
+                        "gateway": False,
+                        "x402_exact": False,
+                    },
+                }
+            },
+        },
+    )
+
+    manager = PolicyManager(str(policy_path))
+    await manager.load()
+    manager.set_mapping("agent-token", "wallet-1", manager.get_wallet_map()["primary"])
+
+    assert manager.is_rail_enabled("x402", "wallet-1") is False
+    assert manager.is_x402_route_enabled("nanopayment", "wallet-1") is False
+    assert manager.is_x402_route_enabled("x402", "wallet-1") is False
+
+
+@pytest.mark.asyncio
+async def test_public_x402_false_overrides_stale_legacy_rails(tmp_path):
+    policy_path = tmp_path / "policy.json"
+    _write_policy(
+        policy_path,
+        {
+            "version": "2.0",
+            "tokens": {"agent-token": {"wallet_alias": "primary", "active": True}},
+            "wallets": {
+                "primary": {
+                    "name": "Primary",
+                    "rails": {
+                        "circle_transfer": True,
+                        "x402": False,
+                        "gateway": True,
+                        "x402_exact": True,
+                    },
+                }
+            },
+        },
+    )
+
+    manager = PolicyManager(str(policy_path))
+    await manager.load()
+    manager.set_mapping("agent-token", "wallet-1", manager.get_wallet_map()["primary"])
+
+    assert manager.is_rail_enabled("x402", "wallet-1") is False
+    assert manager.is_x402_route_enabled("nanopayment", "wallet-1") is False
+    assert manager.is_x402_route_enabled("x402", "wallet-1") is False
+    assert manager.get_policy().to_dict()["wallets"]["primary"]["rails"] == {
+        "circle_transfer": True,
+        "x402": False,
+    }
 
 
 @pytest.mark.asyncio
@@ -299,7 +400,7 @@ async def test_simulate_url_uses_selected_x402_amount_without_wallet_lookup(monk
     agent = AuthenticatedAgent(token="agent-token", wallet_id="eoa:primary")
     policy = SimpleNamespace(
         is_valid_recipient=lambda recipient, wallet_id: True,
-        is_rail_enabled=lambda rail, wallet_id: rail == "x402_exact",
+        is_rail_enabled=lambda rail, wallet_id: rail == "x402",
         check_limits=lambda amount, wallet_id: (True, None),
     )
     client = SimpleNamespace(
@@ -318,6 +419,153 @@ async def test_simulate_url_uses_selected_x402_amount_without_wallet_lookup(monk
     assert result.would_succeed is True
     assert result.route == "x402"
     x402_adapter.simulate.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_pay_rejects_legacy_disabled_nanopayment_route(monkeypatch):
+    selected_kind = SimpleNamespace(get_amount_usdc=lambda: Decimal("0.25"))
+
+    async def fake_inspect_x402_target(**kwargs):
+        return {
+            "ok": True,
+            "requires_payment": True,
+            "selected_kind": selected_kind,
+            "selected_route": "nanopayment",
+        }
+
+    monkeypatch.setattr("omniclaw.agent.routes._inspect_x402_target", fake_inspect_x402_target)
+    agent = AuthenticatedAgent(token="agent-token", wallet_id="wallet-1")
+    policy = SimpleNamespace(
+        is_valid_recipient=lambda recipient, wallet_id: True,
+        is_rail_enabled=lambda rail, wallet_id: rail == "x402",
+        is_x402_route_enabled=lambda route, wallet_id: route != "nanopayment",
+        check_limits=lambda amount, wallet_id: (True, None),
+    )
+    client = SimpleNamespace(
+        config=SimpleNamespace(
+            enable_circle_transfer=False, enable_gateway=True, enable_x402_exact=True
+        ),
+        pay=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await pay(
+            request=PayRequest(recipient="https://seller.example/compute", amount="0.50"),
+            agent=agent,
+            wallet_mgr=SimpleNamespace(),
+            policy_mgr=policy,
+            client=client,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "nanopayment" in exc_info.value.detail
+    client.pay.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_pay_rejects_nanopayment_when_gateway_execution_disabled(monkeypatch):
+    selected_kind = SimpleNamespace(get_amount_usdc=lambda: Decimal("0.25"))
+
+    async def fake_inspect_x402_target(**kwargs):
+        return {
+            "ok": True,
+            "requires_payment": True,
+            "selected_kind": selected_kind,
+            "selected_route": "nanopayment",
+        }
+
+    monkeypatch.setattr("omniclaw.agent.routes._inspect_x402_target", fake_inspect_x402_target)
+    agent = AuthenticatedAgent(token="agent-token", wallet_id="wallet-1")
+    policy = SimpleNamespace(
+        is_valid_recipient=lambda recipient, wallet_id: True,
+        is_rail_enabled=lambda rail, wallet_id: rail == "x402",
+        is_x402_route_enabled=lambda route, wallet_id: True,
+        check_limits=lambda amount, wallet_id: (True, None),
+    )
+    client = SimpleNamespace(
+        config=SimpleNamespace(
+            enable_circle_transfer=False, enable_gateway=False, enable_x402_exact=True
+        ),
+        pay=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await pay(
+            request=PayRequest(recipient="https://seller.example/compute", amount="0.50"),
+            agent=agent,
+            wallet_mgr=SimpleNamespace(),
+            policy_mgr=policy,
+            client=client,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "Gateway nanopayment" in exc_info.value.detail
+    client.pay.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_can_pay_rejects_unsupported_x402_route(monkeypatch):
+    selected_kind = SimpleNamespace(get_amount_usdc=lambda: Decimal("0.25"))
+
+    async def fake_inspect_x402_target(**kwargs):
+        return {
+            "ok": True,
+            "requires_payment": True,
+            "selected_kind": selected_kind,
+            "selected_route": "future-route",
+        }
+
+    monkeypatch.setattr("omniclaw.agent.routes._inspect_x402_target", fake_inspect_x402_target)
+    agent = AuthenticatedAgent(token="agent-token", wallet_id="wallet-1")
+    policy = SimpleNamespace(
+        is_valid_recipient=lambda recipient, wallet_id: True,
+        is_rail_enabled=lambda rail, wallet_id: rail == "x402",
+        is_x402_route_enabled=lambda route, wallet_id: True,
+    )
+    client = SimpleNamespace(
+        config=SimpleNamespace(
+            enable_circle_transfer=False, enable_gateway=True, enable_x402_exact=True
+        )
+    )
+
+    result = await can_pay(
+        recipient="https://seller.example/compute",
+        agent=agent,
+        policy_mgr=policy,
+        client=client,
+    )
+
+    assert result.can_pay is False
+    assert result.reason == "Seller selected an unsupported x402 payment route"
+
+
+@pytest.mark.asyncio
+async def test_create_intent_rejects_url_when_x402_disabled():
+    request = CreateIntentRequest(recipient="https://seller.example/compute", amount="0.25")
+    agent = AuthenticatedAgent(token="agent-token", wallet_id="wallet-1")
+    policy = SimpleNamespace(
+        is_valid_recipient=lambda recipient, wallet_id: True,
+        is_rail_enabled=lambda rail, wallet_id: False,
+        check_limits=lambda amount, wallet_id: (True, None),
+    )
+    client = SimpleNamespace(
+        config=SimpleNamespace(
+            enable_circle_transfer=True, enable_gateway=True, enable_x402_exact=True
+        ),
+        create_payment_intent=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await create_intent(
+            request=request,
+            agent=agent,
+            policy_mgr=policy,
+            client=client,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "x402 rail is disabled by policy"
+    client.create_payment_intent.assert_not_called()
 
 
 @pytest.mark.asyncio

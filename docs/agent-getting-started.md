@@ -15,7 +15,8 @@ docker compose -f examples/agent/buyer/docker-compose.yml --env-file .env up --b
 The buyer server runs in hybrid mode by default:
 
 - Circle Developer Wallet for direct USDC transfers.
-- EOA/Gateway signer for x402 exact and Gateway routes.
+- EOA signer for x402 paid APIs. When the seller advertises `GatewayWalletBatched`
+  and the buyer has Gateway balance, OmniClaw can use the Gateway nanopayment path.
 - Stable policy in `examples/agent/buyer/runtime/policy.json`.
 - Generated wallet state in `examples/agent/buyer/runtime/wallet-state.json`.
 
@@ -25,8 +26,10 @@ Mode requirements:
 | --- | --- |
 | `hybrid` | `CIRCLE_API_KEY`, `ENTITY_SECRET`, `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL` |
 | `circle` | `CIRCLE_API_KEY`, `ENTITY_SECRET` |
-| `gateway` | `CIRCLE_API_KEY`, `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL` |
-| `x402` | `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL` |
+| `x402` | `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL`; add `CIRCLE_API_KEY` and Gateway balance for `GatewayWalletBatched` nanopayments |
+
+For x402 nanopayments, also set `CIRCLE_API_KEY` and fund the Gateway balance. Gateway
+is an x402 execution path, not a separate buyer rail.
 
 ## Configure The Buyer CLI
 
@@ -58,7 +61,7 @@ omniclaw-cli pay \
   --idempotency-key transfer-123
 ```
 
-## Gateway Funding
+## x402 Nanopayment Funding
 
 ```bash
 omniclaw-cli deposit-address

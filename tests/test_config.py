@@ -117,10 +117,10 @@ class TestConfig:
             Config.from_env()
 
     def test_from_env_missing_entity_secret_warns(self) -> None:
-        """Test from_env with missing entity secret logs warning (no longer required)."""
+        """x402 mode with Gateway support needs Circle API, not Circle entity secret."""
         env_vars = {
             "CIRCLE_API_KEY": "test_key",
-            "OMNICLAW_BUYER_MODE": "gateway",
+            "OMNICLAW_BUYER_MODE": "x402",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
         }
 
@@ -130,6 +130,7 @@ class TestConfig:
         assert config.circle_api_key == "test_key"
         assert config.enable_circle_transfer is False
         assert config.enable_gateway is True
+        assert config.enable_x402 is True
 
     def test_x402_mode_does_not_require_circle_credentials(self) -> None:
         """x402 exact-only mode uses the EOA signer and no Circle wallet secret."""
@@ -148,7 +149,7 @@ class TestConfig:
         assert config.enable_x402_exact is True
 
     def test_gateway_mode_does_not_require_entity_secret(self) -> None:
-        """Gateway mode needs Circle API and EOA signer, not Circle entity secret."""
+        """Legacy gateway mode remains accepted for existing deployments."""
         env_vars = {
             "OMNICLAW_BUYER_MODE": "gateway",
             "CIRCLE_API_KEY": "test_key",
@@ -162,6 +163,71 @@ class TestConfig:
         assert config.enable_circle_transfer is False
         assert config.enable_gateway is True
         assert config.enable_x402_exact is True
+        assert config.enable_x402 is True
+
+    def test_x402_public_flag_disables_internal_x402_paths(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "hybrid",
+            "CIRCLE_API_KEY": "test_key",
+            "ENTITY_SECRET": "test_secret",
+            "OMNICLAW_ENABLE_X402": "false",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is True
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is False
+        assert config.enable_x402 is False
+
+    def test_x402_public_flag_enables_standard_x402_without_circle_credentials(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "circle",
+            "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
+            "OMNICLAW_ENABLE_X402": "true",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is True
+        assert config.enable_x402 is True
+
+    def test_x402_public_flag_enables_gateway_only_with_circle_api_key(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "circle",
+            "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
+            "OMNICLAW_ENABLE_X402": "true",
+            "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402_exact is True
+        assert config.enable_x402 is True
+
+    def test_string_override_false_disables_public_x402(self) -> None:
+        config = Config.from_env(
+            buyer_mode="hybrid ",
+            circle_api_key="test_key",
+            entity_secret="test_secret",
+            nanopayments_private_key="0x" + "1" * 64,
+            enable_x402="false",
+        )
+
+        assert config.buyer_mode == "hybrid"
+        assert config.enable_circle_transfer is True
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is False
+        assert config.enable_x402 is False
 
     def test_hybrid_mode_requires_entity_secret_and_private_key(self) -> None:
         """Hybrid buyer mode requires both Circle transfer and EOA credentials."""
