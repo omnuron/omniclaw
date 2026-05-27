@@ -9,6 +9,10 @@ cp .env.example .env
 # For hybrid mode, fill CIRCLE_API_KEY, ENTITY_SECRET, OMNICLAW_PRIVATE_KEY,
 # OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN, OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
 
+mkdir -p examples/agent/buyer/runtime
+cp examples/agent/buyer/policy.example.json examples/agent/buyer/runtime/policy.json
+# Edit examples/agent/buyer/runtime/policy.json so the token matches OMNICLAW_AGENT_TOKEN.
+
 docker compose -f examples/agent/buyer/docker-compose.yml --env-file .env up --build
 ```
 
