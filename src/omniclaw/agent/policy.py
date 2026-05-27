@@ -305,29 +305,14 @@ class RailConfig:
 
     circle_transfer: bool = True
     x402: bool = True
-    x402_explicit: bool = False
-    legacy_gateway: bool | None = None
-    legacy_x402_exact: bool | None = None
 
     @classmethod
     def from_dict(cls, data: dict | None) -> RailConfig:
         if not data:
             return cls()
-        x402_explicit = data.get("x402") is not None
-        x402 = data.get("x402")
-        legacy_gateway = data.get("gateway") if "gateway" in data else None
-        legacy_x402_exact = data.get("x402_exact") if "x402_exact" in data else None
-        if x402 is None:
-            legacy_values = [
-                value for value in (legacy_x402_exact, legacy_gateway) if value is not None
-            ]
-            x402 = any(bool(value) for value in legacy_values) if legacy_values else True
         return cls(
             circle_transfer=bool(data.get("circle_transfer", True)),
-            x402=bool(x402),
-            x402_explicit=x402_explicit,
-            legacy_gateway=None if legacy_gateway is None else bool(legacy_gateway),
-            legacy_x402_exact=None if legacy_x402_exact is None else bool(legacy_x402_exact),
+            x402=bool(data.get("x402", True)),
         )
 
     def to_dict(self) -> dict[str, bool]:
@@ -335,18 +320,6 @@ class RailConfig:
             "circle_transfer": self.circle_transfer,
             "x402": self.x402,
         }
-
-    def is_x402_route_enabled(self, selected_route: object) -> bool:
-        if not self.x402:
-            return False
-        if self.x402_explicit:
-            return True
-        route = str(selected_route or "").strip().lower()
-        if route == "nanopayment" and self.legacy_gateway is not None:
-            return self.legacy_gateway
-        if route == "x402" and self.legacy_x402_exact is not None:
-            return self.legacy_x402_exact
-        return True
 
 
 def _normalize_wallets(wallets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -730,12 +703,9 @@ class PolicyManager:
         rails = self.rail_config(wallet_id)
         if rail == "circle_transfer":
             return rails.circle_transfer
-        if rail in {"x402", "x402_exact", "gateway"}:
+        if rail == "x402":
             return rails.x402
         return False
-
-    def is_x402_route_enabled(self, selected_route: object, wallet_id: str | None = None) -> bool:
-        return self.rail_config(wallet_id).is_x402_route_enabled(selected_route)
 
 
 class WalletManager:

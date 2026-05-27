@@ -117,7 +117,7 @@ class Config:
 
     def __post_init__(self) -> None:
         mode = self.buyer_mode.strip().lower()
-        if mode not in {"hybrid", "circle", "gateway", "x402"}:
+        if mode not in {"hybrid", "circle", "x402"}:
             raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, x402")
         if (self.enable_circle_transfer or self.enable_gateway) and not self.circle_api_key:
             raise ValueError(
@@ -178,12 +178,6 @@ class Config:
                 "enable_gateway": False,
                 "enable_x402_exact": False,
             },
-            # Legacy alias kept for existing deployments; public docs use x402.
-            "gateway": {
-                "enable_circle_transfer": False,
-                "enable_gateway": True,
-                "enable_x402_exact": True,
-            },
             "x402": {
                 "enable_circle_transfer": False,
                 "enable_gateway": bool(circle_api_key),
@@ -205,8 +199,8 @@ class Config:
         enable_circle_transfer = rail_flag(
             "enable_circle_transfer", "OMNICLAW_ENABLE_CIRCLE_TRANSFER"
         )
-        enable_gateway = rail_flag("enable_gateway", "OMNICLAW_ENABLE_GATEWAY")
-        enable_x402_exact = rail_flag("enable_x402_exact", "OMNICLAW_ENABLE_X402_EXACT")
+        enable_gateway = bool(defaults["enable_gateway"])
+        enable_x402_exact = bool(defaults["enable_x402_exact"])
         x402_env_value = _get_env_var("OMNICLAW_ENABLE_X402")
         if "enable_x402" in overrides:
             enable_x402 = _parse_bool(overrides["enable_x402"])
@@ -216,13 +210,6 @@ class Config:
             enable_x402 = _parse_bool(x402_env_value)
             enable_x402_exact = enable_x402
             enable_gateway = enable_x402 and bool(circle_api_key)
-        if "enable_gateway" in overrides or _get_env_var("OMNICLAW_ENABLE_GATEWAY") is not None:
-            enable_gateway = rail_flag("enable_gateway", "OMNICLAW_ENABLE_GATEWAY")
-        if (
-            "enable_x402_exact" in overrides
-            or _get_env_var("OMNICLAW_ENABLE_X402_EXACT") is not None
-        ):
-            enable_x402_exact = rail_flag("enable_x402_exact", "OMNICLAW_ENABLE_X402_EXACT")
 
         storage_backend = override_or_env("storage_backend", "OMNICLAW_STORAGE_BACKEND", "memory")
         redis_url = override_or_env("redis_url", "OMNICLAW_REDIS_URL")

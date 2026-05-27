@@ -70,14 +70,6 @@ def _policy_rail_enabled(policy_mgr: PolicyManager, rail: str, wallet_id: str | 
     return True
 
 
-def _policy_x402_route_enabled(
-    policy_mgr: PolicyManager, selected_route: object, wallet_id: str | None
-) -> bool:
-    if hasattr(policy_mgr, "is_x402_route_enabled"):
-        return bool(policy_mgr.is_x402_route_enabled(selected_route, wallet_id))
-    return _policy_rail_enabled(policy_mgr, "x402", wallet_id)
-
-
 def _server_rail_enabled(client: OmniClaw, rail: str) -> bool:
     config = getattr(client, "config", None)
     if config is None:
@@ -965,9 +957,9 @@ async def pay(
             method=request.method,
             headers=request.headers,
             body=request.body,
-            allow_gateway=_policy_x402_route_enabled(policy_mgr, "nanopayment", agent.wallet_id)
+            allow_gateway=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
             and _server_rail_enabled(client, "gateway"),
-            allow_x402_exact=_policy_x402_route_enabled(policy_mgr, "x402", agent.wallet_id)
+            allow_x402_exact=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
             and _server_rail_enabled(client, "x402_exact"),
         )
         if not x402_details.get("ok"):
@@ -996,11 +988,6 @@ async def pay(
                 raise HTTPException(
                     status_code=400,
                     detail=f"Payment rail '{selected_rail}' is disabled by policy",
-                )
-            if not _policy_x402_route_enabled(policy_mgr, preferred_url_route, agent.wallet_id):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"x402 route '{preferred_url_route}' is disabled by policy",
                 )
             if selected_rail and not _server_x402_route_enabled(client, preferred_url_route):
                 raise HTTPException(
@@ -1135,9 +1122,9 @@ async def simulate(
             method=request.method,
             headers=request.headers,
             body=request.body,
-            allow_gateway=_policy_x402_route_enabled(policy_mgr, "nanopayment", agent.wallet_id)
+            allow_gateway=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
             and _server_rail_enabled(client, "gateway"),
-            allow_x402_exact=_policy_x402_route_enabled(policy_mgr, "x402", agent.wallet_id)
+            allow_x402_exact=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
             and _server_rail_enabled(client, "x402_exact"),
         )
         if not x402_details.get("ok"):
@@ -1161,12 +1148,6 @@ async def simulate(
                     would_succeed=False,
                     route="x402",
                     reason="Seller selected an unsupported x402 payment route",
-                )
-            if not _policy_x402_route_enabled(policy_mgr, selected_route, agent.wallet_id):
-                return SimulateResponse(
-                    would_succeed=False,
-                    route="x402",
-                    reason=f"x402 route '{selected_route}' is disabled by policy",
                 )
             if _x402_selected_amount_exceeds_cap(selected_kind, amount_raw):
                 return SimulateResponse(
@@ -1400,11 +1381,6 @@ async def confirm_intent(
                 raise HTTPException(
                     status_code=400, detail=f"Payment rail '{rail}' is disabled by policy"
                 )
-            if not _policy_x402_route_enabled(policy_mgr, route, agent.wallet_id):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"x402 route '{route}' is disabled by policy",
-                )
             if rail and not _server_x402_route_enabled(client, route):
                 raise HTTPException(
                     status_code=400,
@@ -1543,9 +1519,9 @@ async def can_pay(
         client=client,
         wallet_id=agent.wallet_id,
         url=recipient,
-        allow_gateway=_policy_x402_route_enabled(policy_mgr, "nanopayment", agent.wallet_id)
+        allow_gateway=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
         and _server_rail_enabled(client, "gateway"),
-        allow_x402_exact=_policy_x402_route_enabled(policy_mgr, "x402", agent.wallet_id)
+        allow_x402_exact=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
         and _server_rail_enabled(client, "x402_exact"),
     )
     if not inspection.get("ok"):
@@ -1565,10 +1541,6 @@ async def can_pay(
     if _rail_for_selected_route(selected_route) is None:
         return CanPayResponse(
             can_pay=False, reason="Seller selected an unsupported x402 payment route"
-        )
-    if not _policy_x402_route_enabled(policy_mgr, selected_route, agent.wallet_id):
-        return CanPayResponse(
-            can_pay=False, reason=f"x402 route '{selected_route}' is disabled by policy"
         )
     if inspection.get("selected_route") == "nanopayment" and not inspection.get("gateway_ready"):
         return CanPayResponse(can_pay=False, reason=str(inspection.get("gateway_reason") or ""))
@@ -1657,9 +1629,9 @@ async def x402_inspect(
         method=request.method,
         headers=request.headers,
         body=request.body,
-        allow_gateway=_policy_x402_route_enabled(policy_mgr, "nanopayment", agent.wallet_id)
+        allow_gateway=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
         and _server_rail_enabled(client, "gateway"),
-        allow_x402_exact=_policy_x402_route_enabled(policy_mgr, "x402", agent.wallet_id)
+        allow_x402_exact=_policy_rail_enabled(policy_mgr, "x402", agent.wallet_id)
         and _server_rail_enabled(client, "x402_exact"),
     )
     if not inspection.get("ok"):
@@ -1703,8 +1675,6 @@ async def x402_inspect(
         policy_mgr, selected_rail, agent.wallet_id
     ):
         reason = f"Payment rail '{selected_rail}' is disabled by policy"
-    elif not _policy_x402_route_enabled(policy_mgr, selected_route, agent.wallet_id):
-        reason = f"x402 route '{selected_route}' is disabled by policy"
     elif selected_route in {"nanopayment", "x402"} and not _server_x402_route_enabled(
         client, selected_route
     ):

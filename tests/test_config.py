@@ -133,7 +133,7 @@ class TestConfig:
         assert config.enable_x402 is True
 
     def test_x402_mode_does_not_require_circle_credentials(self) -> None:
-        """x402 exact-only mode uses the EOA signer and no Circle wallet secret."""
+        """x402 mode can use the standard x402 path without Circle credentials."""
         env_vars = {
             "OMNICLAW_BUYER_MODE": "x402",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
@@ -148,22 +148,18 @@ class TestConfig:
         assert config.enable_gateway is False
         assert config.enable_x402_exact is True
 
-    def test_gateway_mode_does_not_require_entity_secret(self) -> None:
-        """Legacy gateway mode remains accepted for existing deployments."""
+    def test_gateway_buyer_mode_is_not_accepted(self) -> None:
         env_vars = {
             "OMNICLAW_BUYER_MODE": "gateway",
             "CIRCLE_API_KEY": "test_key",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
         }
 
-        with patch.dict(os.environ, env_vars, clear=True):
-            config = Config.from_env()
-
-        assert config.entity_secret == ""
-        assert config.enable_circle_transfer is False
-        assert config.enable_gateway is True
-        assert config.enable_x402_exact is True
-        assert config.enable_x402 is True
+        with (
+            patch.dict(os.environ, env_vars, clear=True),
+            pytest.raises(ValueError, match="hybrid, circle, x402"),
+        ):
+            Config.from_env()
 
     def test_x402_public_flag_disables_internal_x402_paths(self) -> None:
         env_vars = {
