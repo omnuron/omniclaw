@@ -3,6 +3,8 @@
 import base64
 import json
 import os
+from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -11,6 +13,7 @@ import pytest
 from omniclaw.protocols.nanopayments.adapter import NanopaymentAdapter, NanopaymentProtocolAdapter
 from omniclaw.protocols.nanopayments.client import NanopaymentClient
 from omniclaw.protocols.nanopayments.exceptions import GatewayAPIError
+from omniclaw.protocols.nanopayments.types import NanopaymentResult
 from omniclaw.protocols.x402 import AcceptedPaymentKind
 
 
@@ -51,7 +54,7 @@ async def test_x402_gateway_url_payment_without_circle_api_uses_onchain_balance(
                 "extra": {
                     "name": "GatewayWalletBatched",
                     "version": "1",
-                    "verifyingContract": "0x0077777d7eba4688bdef3e311b846f25870a19b5",
+                    "verifyingContract": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
                     "minValiditySeconds": 604800,
                     "assets": [
                         {
@@ -71,6 +74,9 @@ async def test_x402_gateway_url_payment_without_circle_api_uses_onchain_balance(
 
     async def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
+        assert request.method == "POST"
+        assert request.headers.get("x-trace-id") == "abc123"
+        assert request.content == b'{"input":20}'
         if "PAYMENT-SIGNATURE" not in request.headers:
             return httpx.Response(
                 402,
@@ -111,7 +117,13 @@ async def test_x402_gateway_url_payment_without_circle_api_uses_onchain_balance(
     adapter._get_onchain_available_atomic = AsyncMock(return_value=10_000)  # type: ignore[method-assign]
 
     try:
-        result = await adapter.pay_x402_url(url)
+        result = await adapter.pay_x402_url(
+            url,
+            method="POST",
+            headers={"x-trace-id": "abc123"},
+            body='{"input":20}',
+            max_amount_usdc="0.001",
+        )
     finally:
         await http_client.aclose()
 
@@ -122,6 +134,47 @@ async def test_x402_gateway_url_payment_without_circle_api_uses_onchain_balance(
     client.check_balance.assert_not_awaited()
     client.get_supported.assert_not_awaited()
     adapter._get_onchain_available_atomic.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_protocol_adapter_forwards_x402_request_details() -> None:
+    nano_result = NanopaymentResult(
+        success=True,
+        payer="0xpayer",
+        seller="0xseller",
+        transaction="batch-1",
+        amount_usdc="0.001",
+        amount_atomic="1000",
+        network="eip155:5042002",
+        response_data={"ok": True},
+        is_nanopayment=True,
+    )
+    adapter = SimpleNamespace(
+        pay_x402_url=AsyncMock(return_value=nano_result),
+        _strict_settlement=False,
+    )
+    protocol = NanopaymentProtocolAdapter(adapter)  # type: ignore[arg-type]
+
+    result = await protocol.execute(
+        wallet_id="wallet-1",
+        recipient="https://seller.example/compute",
+        amount=Decimal("0.001"),
+        method="POST",
+        request_headers={"x-trace-id": "abc123"},
+        request_body='{"input":20}',
+    )
+
+    adapter.pay_x402_url.assert_awaited_once_with(
+        url="https://seller.example/compute",
+        method="POST",
+        headers={"x-trace-id": "abc123"},
+        body='{"input":20}',
+        max_amount_usdc="0.001",
+    )
+    assert result.success is True
+    assert result.metadata["payment_source"] == "gateway_balance"
+    assert result.metadata["execution_route"] == "GatewayWalletBatched"
+    assert result.metadata["facilitator"] == "GatewayWalletBatched"
 
 
 @pytest.mark.asyncio
@@ -148,7 +201,7 @@ async def test_onchain_balance_accepts_x402_accepted_kind_shape() -> None:
         extra={
             "name": "GatewayWalletBatched",
             "version": "1",
-            "verifyingContract": "0x0077777d7eba4688bdef3e311b846f25870a19b5",
+            "verifyingContract": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
         },
     )
 

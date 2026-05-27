@@ -451,12 +451,28 @@ class NanopaymentAdapter:
         self,
         gateway_kind: Any,
     ) -> GatewayBalance:
+        api_balance: GatewayBalance | None = None
+        required_atomic = int(str(self._kind_value(gateway_kind, "amount") or "0"))
         if self._client.has_api_key:
-            return await self._client.check_balance(
-                address=self._get_address(),
-                network=str(self._kind_value(gateway_kind, "network") or ""),
-            )
-        return await self.get_onchain_available_balance(gateway_kind)
+            try:
+                api_balance = await self._client.check_balance(
+                    address=self._get_address(),
+                    network=str(self._kind_value(gateway_kind, "network") or ""),
+                )
+                if api_balance.available >= required_atomic:
+                    return api_balance
+            except Exception as exc:
+                logger.warning("Gateway API balance check failed; falling back on-chain: %s", exc)
+
+        try:
+            onchain_balance = await self.get_onchain_available_balance(gateway_kind)
+            if api_balance is None or onchain_balance.available > api_balance.available:
+                return onchain_balance
+        except Exception:
+            if api_balance is None:
+                raise
+
+        return api_balance
 
     async def _get_onchain_available_atomic(
         self,
@@ -530,7 +546,8 @@ class NanopaymentAdapter:
         url: str,
         method: str = "GET",
         headers: dict | None = None,
-        body: bytes | None = None,
+        body: bytes | str | None = None,
+        max_amount_usdc: str | Decimal | None = None,
     ) -> NanopaymentResult:
         """
         Pay for a URL-based resource via x402 with Gateway batching.
@@ -684,6 +701,15 @@ class NanopaymentAdapter:
                 verifying_contract=verifying_contract,
             ),
         )
+        if max_amount_usdc is not None:
+            payment_amount_usdc = Decimal(str(updated_kind.amount)) / Decimal(1_000_000)
+            if payment_amount_usdc > Decimal(str(max_amount_usdc)):
+                raise InsufficientBalanceError(
+                    reason=(
+                        f"x402 price {payment_amount_usdc} exceeds max amount {max_amount_usdc}"
+                    ),
+                    payer=self._get_address(),
+                )
         # Step 6: Check balance - FAIL if insufficient
         payer_address = self._get_address()
         balance = await self._gateway_available_balance(gateway_kind)
@@ -1219,8 +1245,20 @@ class NanopaymentProtocolAdapter:
         strict_settlement = bool(getattr(self._adapter, "_strict_settlement", False))
         try:
             if _is_url(recipient):
+                request_method = str(kwargs.get("http_method", kwargs.get("method", "GET")))
+                request_headers = kwargs.get("request_headers") or kwargs.get("headers")
+                request_body = kwargs.get("request_body", kwargs.get("body"))
+                request_json = kwargs.get("request_json")
+                if request_body is None and request_json is not None:
+                    request_body = json.dumps(request_json)
+                    request_headers = dict(request_headers or {})
+                    request_headers.setdefault("content-type", "application/json")
                 result = await self._adapter.pay_x402_url(
                     url=recipient,
+                    method=request_method,
+                    headers=request_headers,
+                    body=request_body,
+                    max_amount_usdc=str(amount),
                 )
             else:
                 # Address payment below micro threshold
@@ -1257,6 +1295,12 @@ class NanopaymentProtocolAdapter:
                 resource_data=result.response_data,
                 metadata={
                     "nanopayment": True,
+                    "selected_route": "nanopayment" if _is_url(recipient) else "gateway",
+                    "payment_source": "gateway_balance" if _is_url(recipient) else "gateway",
+                    "execution_route": (
+                        "GatewayWalletBatched" if _is_url(recipient) else "direct_gateway"
+                    ),
+                    "facilitator": "GatewayWalletBatched" if _is_url(recipient) else None,
                     "payer": result.payer,
                     "seller": result.seller,
                     "amount_atomic": result.amount_atomic,

@@ -61,9 +61,14 @@ def balance_detail() -> dict[str, Any]:
         if is_quiet():
             typer.echo(json.dumps(data, indent=2))
         else:
+            gateway_balance = (
+                data.get("gateway_balance")
+                if data.get("gateway_balance_available")
+                else data.get("gateway_onchain_balance")
+            )
             typer.echo("=== WALLET BALANCE ===")
             typer.echo(f"EOA Address: {data.get('eoa_address')}")
-            typer.echo(f"Gateway Balance: {data.get('gateway_balance')} USDC")
+            typer.echo(f"Gateway Balance: {gateway_balance} USDC")
             typer.echo(f"Circle Wallet: {data.get('circle_wallet_balance')} USDC")
 
         return data

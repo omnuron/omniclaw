@@ -33,10 +33,13 @@ Start the policy engine:
 
 ```bash
 cp .env.example .env
-# Hybrid mode: fill CIRCLE_API_KEY, ENTITY_SECRET, OMNICLAW_PRIVATE_KEY,
-# OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN, OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
-# x402-only mode does not require CIRCLE_API_KEY; it uses OMNICLAW_PRIVATE_KEY
-# and funded Gateway balance for GatewayWalletBatched nanopayments.
+# Hybrid mode (default): leave OMNICLAW_BUYER_MODE=hybrid and fill CIRCLE_API_KEY,
+# ENTITY_SECRET, OMNICLAW_PRIVATE_KEY, OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN,
+# OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
+# x402-only Gateway mode: set OMNICLAW_BUYER_MODE=x402, leave CIRCLE_API_KEY and
+# ENTITY_SECRET empty unless you need optional Circle Gateway API helpers, and fill
+# OMNICLAW_PRIVATE_KEY, OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN,
+# OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
 
 mkdir -p examples/agent/buyer/runtime
 cp examples/agent/buyer/policy.example.json examples/agent/buyer/runtime/policy.json

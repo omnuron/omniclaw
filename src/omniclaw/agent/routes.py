@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -30,7 +31,7 @@ from omniclaw.agent.models import (
 )
 from omniclaw.agent.policy import PolicyManager, WalletManager
 from omniclaw.core.logging import get_logger
-from omniclaw.core.types import PaymentMethod
+from omniclaw.core.types import Network, PaymentMethod
 from omniclaw.guards.confirmations import ConfirmationStore
 
 if TYPE_CHECKING:
@@ -69,6 +70,40 @@ def _public_x402_route(selected_route: object) -> str | None:
     if _rail_for_selected_route(selected_route) == "x402":
         return "x402"
     return None
+
+
+def _x402_execution_route(selected_route: object, payment_source: object = None) -> str | None:
+    route = str(selected_route or "").strip().lower()
+    source = str(payment_source or "").strip().lower()
+    if route == "nanopayment" or source == "gateway_balance":
+        return "GatewayWalletBatched"
+    if route == "x402":
+        return "exact"
+    return None
+
+
+def _gateway_manager_address_overrides(
+    config: dict[str, Any],
+    network: str,
+) -> dict[str, str | None]:
+    gateway_address = config.get("gateway_contract_address") or os.environ.get(
+        "CIRCLE_GATEWAY_CONTRACT"
+    )
+    usdc_address = (
+        config.get("gateway_usdc_address")
+        or os.environ.get("CIRCLE_GATEWAY_USDC_ADDRESS")
+        or os.environ.get("CIRCLE_GATEWAY_USDC_CONTRACT")
+    )
+    if not gateway_address:
+        from omniclaw.protocols.nanopayments.constants import GATEWAY_WALLET_CONTRACTS_CAIP2
+
+        gateway_address = GATEWAY_WALLET_CONTRACTS_CAIP2.get(network)
+    if not usdc_address:
+        from omniclaw.core.cctp_constants import USDC_CONTRACTS
+
+        with contextlib.suppress(Exception):
+            usdc_address = USDC_CONTRACTS.get(Network.from_string(network).value)
+    return {"gateway_address": gateway_address, "usdc_address": usdc_address}
 
 
 def _public_payment_method(recipient: str, method: object) -> str:
@@ -484,16 +519,22 @@ async def get_balance(
         note = None
         try:
             gateway_balance = await client.get_gateway_balance(agent.wallet_id)
+            source = "gateway_api"
         except Exception as exc:
-            gateway_balance = None
-            note = (
-                "Gateway API balance unavailable. x402 Gateway payments use seller-specific "
-                f"on-chain balance checks when needed: {exc}"
-            )
+            try:
+                gateway_balance = await client.get_gateway_onchain_balance(agent.wallet_id)
+                source = "gateway_onchain"
+                note = f"Gateway API balance unavailable; using on-chain Gateway balance: {exc}"
+            except Exception:
+                gateway_balance = None
+                source = "unavailable"
+                note = (
+                    "Gateway API balance unavailable. x402 Gateway payments use "
+                    f"seller-specific on-chain balance checks when needed: {exc}"
+                )
         available = gateway_balance.available_decimal if gateway_balance else "0.00"
         total = gateway_balance.total_decimal if gateway_balance else None
         reserved = None
-        source = "gateway_api" if gateway_balance else "unavailable"
     else:
         balance = await wallet_mgr.get_wallet_balance(agent.wallet_id)
         if balance is None:
@@ -813,6 +854,7 @@ async def withdraw_trustless(
             network=network,
             rpc_url=rpc_url,
             nanopayment_client=nanopayment_client,
+            **_gateway_manager_address_overrides(config, network),
         )
 
         delay_blocks = await manager.get_withdrawal_delay()
@@ -888,6 +930,7 @@ async def complete_trustless_withdrawal(
             network=network,
             rpc_url=rpc_url,
             nanopayment_client=nanopayment_client,
+            **_gateway_manager_address_overrides(config, network),
         )
 
         current_block = manager._w3.eth.block_number
@@ -1128,6 +1171,12 @@ async def pay(
             if result.status and hasattr(result.status, "value")
             else (str(result.status) if result.status else "failed"),
             method=_public_payment_method(result.recipient, result.method),
+            selected_route=_public_x402_route(result.metadata.get("selected_route"))
+            if result.metadata
+            else None,
+            payment_source=result.metadata.get("payment_source") if result.metadata else None,
+            execution_route=result.metadata.get("execution_route") if result.metadata else None,
+            facilitator=result.metadata.get("facilitator") if result.metadata else None,
             error=result.error,
             requires_confirmation=requires_confirmation,
             confirmation_id=confirmation_id,
@@ -1763,6 +1812,7 @@ async def x402_inspect(
         router_detected_route=_public_x402_route(inspection.get("router_detected_route")),
         selected_route=_public_x402_route(selected_route),
         payment_source=payment_source,
+        execution_route=_x402_execution_route(selected_route, payment_source),
         buyer_address=buyer_address,
         gateway_available_balance=gateway_available_balance,
         selected_scheme=selected_kind.scheme if selected_kind else None,

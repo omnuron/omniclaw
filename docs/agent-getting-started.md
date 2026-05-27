@@ -8,6 +8,9 @@ This guide is for agent buyers.
 cp .env.example .env
 # For hybrid mode, fill CIRCLE_API_KEY, ENTITY_SECRET, OMNICLAW_PRIVATE_KEY,
 # OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN, OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
+# For x402-only Gateway mode instead, set OMNICLAW_BUYER_MODE=x402 and leave
+# CIRCLE_API_KEY and ENTITY_SECRET empty unless you need optional Circle Gateway
+# API helper operations.
 
 mkdir -p examples/agent/buyer/runtime
 cp examples/agent/buyer/policy.example.json examples/agent/buyer/runtime/policy.json

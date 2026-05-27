@@ -310,6 +310,23 @@ class OmniClaw:
             )
         return network
 
+    def _gateway_wallet_manager_kwargs(self) -> dict[str, str | None]:
+        caip2_network = self._nanopayment_network()
+        gateway_address = self._config.gateway_contract_address
+        usdc_address = self._config.gateway_usdc_address
+        if not gateway_address:
+            from omniclaw.protocols.nanopayments.constants import GATEWAY_WALLET_CONTRACTS_CAIP2
+
+            gateway_address = GATEWAY_WALLET_CONTRACTS_CAIP2.get(caip2_network)
+        if not usdc_address:
+            from omniclaw.core.cctp_constants import USDC_CONTRACTS
+
+            usdc_address = USDC_CONTRACTS.get(self._config.network.value)
+        return {
+            "gateway_address": gateway_address,
+            "usdc_address": usdc_address,
+        }
+
     @staticmethod
     def _route_value(route: Any) -> str:
         return str(route.value if hasattr(route, "value") else route or "").strip().lower()
@@ -536,6 +553,7 @@ class OmniClaw:
             network=net,
             rpc_url=self._config.rpc_url or "",
             nanopayment_client=self._nano_client,
+            **self._gateway_wallet_manager_kwargs(),
         )
         return await manager.deposit(
             amount_usdc, check_gas=check_gas, skip_if_insufficient_gas=skip_if_insufficient_gas
@@ -580,6 +598,7 @@ class OmniClaw:
             network=net,
             rpc_url=self._config.rpc_url or "",
             nanopayment_client=self._nano_client,
+            **self._gateway_wallet_manager_kwargs(),
         )
         return await manager.withdraw(
             amount_usdc=amount_usdc,
@@ -660,6 +679,7 @@ class OmniClaw:
             network=network,
             rpc_url=self._config.rpc_url or "",
             nanopayment_client=self._nano_client,
+            **self._gateway_wallet_manager_kwargs(),
         )
         available = await manager.get_gateway_available_balance()
         total = available
@@ -1128,12 +1148,15 @@ class OmniClaw:
         source_network: Network | None = None
         try:
             # Try to get source network from Circle wallet first, then fall back to config default.
-            try:
-                wallet_info = self._wallet_service.get_wallet(wallet_id)
-                source_network = Network.from_string(wallet_info.blockchain)
-            except Exception:
-                if self._nano_adapter:
-                    source_network = self._config.network
+            if not self._config.enable_circle_transfer and self._nano_adapter:
+                source_network = self._config.network
+            else:
+                try:
+                    wallet_info = self._wallet_service.get_wallet(wallet_id)
+                    source_network = Network.from_string(wallet_info.blockchain)
+                except Exception:
+                    if self._nano_adapter:
+                        source_network = self._config.network
 
             if source_network is None:
                 # Fallback to ETH Sepolia if we can't determine the network
@@ -1655,9 +1678,12 @@ class OmniClaw:
         # Detect the actual route early so early-return reasons include it
         source_network: Network | None = None
         try:
-            source_network = Network.from_string(
-                self._wallet_service.get_wallet(wallet_id).blockchain
-            )
+            if not self._config.enable_circle_transfer and self._nano_adapter:
+                source_network = self._config.network
+            else:
+                source_network = Network.from_string(
+                    self._wallet_service.get_wallet(wallet_id).blockchain
+                )
             detected_route = (
                 self._router.detect_method(
                     recipient,
@@ -1707,6 +1733,7 @@ class OmniClaw:
                         network=network,
                         rpc_url=self._config.rpc_url or "",
                         nanopayment_client=self._nano_client,
+                        **self._gateway_wallet_manager_kwargs(),
                     )
                     # Use on-chain available balance
                     available = await manager.get_gateway_available_balance()

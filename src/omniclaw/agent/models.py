@@ -36,6 +36,10 @@ class PayResponse(BaseModel):
     recipient: str
     status: str
     method: str
+    selected_route: str | None = None
+    payment_source: str | None = None
+    execution_route: str | None = None
+    facilitator: str | None = None
     error: str | None = None
     requires_confirmation: bool = False
     confirmation_id: str | None = None
@@ -203,6 +207,7 @@ class X402InspectResponse(BaseModel):
     router_detected_route: str | None = None
     selected_route: str | None = None
     payment_source: str | None = None
+    execution_route: str | None = None
     buyer_address: str | None = None
     gateway_available_balance: str | None = None
     selected_scheme: str | None = None

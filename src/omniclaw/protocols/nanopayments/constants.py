@@ -160,3 +160,13 @@ CIRCLE_DOMAIN_TO_CAIP2: dict[int, str] = {
 
 CAIP2_TO_CIRCLE_DOMAIN: dict[str, int] = {v: k for k, v in CIRCLE_DOMAIN_TO_CAIP2.items()}
 """Reverse mapping from CAIP-2 to Circle domain ID."""
+
+GATEWAY_WALLET_CONTRACT_EVM: str = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9"
+"""Circle GatewayWallet contract address used by supported EVM networks."""
+
+GATEWAY_WALLET_CONTRACTS_CAIP2: dict[str, str] = {
+    network: GATEWAY_WALLET_CONTRACT_EVM
+    for network in CAIP2_TO_CIRCLE_DOMAIN
+    if network.startswith("eip155:")
+}
+"""Default GatewayWallet contract addresses keyed by CAIP-2 network."""

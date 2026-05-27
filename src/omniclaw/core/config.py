@@ -58,6 +58,8 @@ class Config:
 
     # Gateway API for gasless transfers
     gateway_api_url: str = "https://gateway-api-testnet.circle.com/v1"
+    gateway_contract_address: str | None = None
+    gateway_usdc_address: str | None = None
 
     # Timeouts (seconds)
     request_timeout: float = 60.0
@@ -125,6 +127,8 @@ class Config:
             raise ValueError("ENTITY_SECRET is required when Circle transfer rail is enabled")
         if (self.enable_gateway or self.enable_x402_exact) and not self.nanopayments_private_key:
             raise ValueError("OMNICLAW_PRIVATE_KEY is required when x402 payments are enabled")
+        if self.enable_x402 and not self.rpc_url:
+            raise ValueError("OMNICLAW_RPC_URL is required when x402 payments are enabled")
         if not self.entity_secret and not self.nanopayments_private_key:
             import logging
 
@@ -270,6 +274,12 @@ class Config:
                 == "true"
             )
         )
+        gateway_contract_address = override_or_env(
+            "gateway_contract_address", "CIRCLE_GATEWAY_CONTRACT"
+        )
+        gateway_usdc_address = override_or_env(
+            "gateway_usdc_address", "CIRCLE_GATEWAY_USDC_ADDRESS"
+        ) or override_or_env("gateway_usdc_address", "CIRCLE_GATEWAY_USDC_CONTRACT")
 
         return cls(
             circle_api_key=circle_api_key,  # type: ignore
@@ -279,6 +289,8 @@ class Config:
             circle_api_base_url=overrides.get("circle_api_base_url", cls.circle_api_base_url),
             x402_facilitator_url=overrides.get("x402_facilitator_url", cls.x402_facilitator_url),
             gateway_api_url=overrides.get("gateway_api_url", cls.gateway_api_url),
+            gateway_contract_address=gateway_contract_address,
+            gateway_usdc_address=gateway_usdc_address,
             request_timeout=overrides.get("request_timeout", cls.request_timeout),
             transaction_poll_interval=overrides.get(
                 "transaction_poll_interval", cls.transaction_poll_interval
@@ -323,6 +335,8 @@ class Config:
             "circle_api_base_url": self.circle_api_base_url,
             "x402_facilitator_url": self.x402_facilitator_url,
             "gateway_api_url": self.gateway_api_url,
+            "gateway_contract_address": self.gateway_contract_address,
+            "gateway_usdc_address": self.gateway_usdc_address,
             "request_timeout": self.request_timeout,
             "transaction_poll_interval": self.transaction_poll_interval,
             "transaction_poll_timeout": self.transaction_poll_timeout,

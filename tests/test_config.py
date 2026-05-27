@@ -69,6 +69,7 @@ class TestConfig:
             enable_gateway=False,
             enable_x402_exact=True,
             nanopayments_private_key="0x" + "1" * 64,
+            rpc_url="https://rpc.example",
         )
         assert config.entity_secret == ""
 
@@ -122,6 +123,7 @@ class TestConfig:
             "CIRCLE_API_KEY": "test_key",
             "OMNICLAW_BUYER_MODE": "x402",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -137,6 +139,7 @@ class TestConfig:
         env_vars = {
             "OMNICLAW_BUYER_MODE": "x402",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -148,6 +151,21 @@ class TestConfig:
         assert config.enable_gateway is True
         assert config.enable_x402_exact is True
 
+    def test_gateway_contract_overrides_are_loaded_from_env(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
+            "CIRCLE_GATEWAY_CONTRACT": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+            "CIRCLE_GATEWAY_USDC_ADDRESS": "0x3600000000000000000000000000000000000000",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.gateway_contract_address == "0x0077777d7EBA4688BDeF3E311b846F25870A19B9"
+        assert config.gateway_usdc_address == "0x3600000000000000000000000000000000000000"
+
     def test_gateway_buyer_mode_is_not_accepted(self) -> None:
         env_vars = {
             "OMNICLAW_BUYER_MODE": "gateway",
@@ -158,6 +176,18 @@ class TestConfig:
         with (
             patch.dict(os.environ, env_vars, clear=True),
             pytest.raises(ValueError, match="hybrid, circle, x402"),
+        ):
+            Config.from_env()
+
+    def test_x402_mode_requires_rpc_url(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with (
+            patch.dict(os.environ, env_vars, clear=True),
+            pytest.raises(ValueError, match="OMNICLAW_RPC_URL"),
         ):
             Config.from_env()
 
@@ -183,6 +213,7 @@ class TestConfig:
             "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
             "OMNICLAW_ENABLE_X402": "true",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -200,6 +231,7 @@ class TestConfig:
             "OMNICLAW_ENABLE_X402": "true",
             "CIRCLE_API_KEY": "test_key",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -216,6 +248,7 @@ class TestConfig:
             circle_api_key="test_key",
             entity_secret="test_secret",
             nanopayments_private_key="0x" + "1" * 64,
+            rpc_url="https://rpc.example",
             enable_x402="false",
         )
 
