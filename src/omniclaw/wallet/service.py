@@ -16,6 +16,8 @@ from omniclaw.core.circle_client import CircleClient
 from omniclaw.core.config import Config
 from omniclaw.core.exceptions import (
     InsufficientBalanceError,
+    PaymentOutcomeUnknownError,
+    TransactionTimeoutError,
     WalletError,
 )
 from omniclaw.core.types import (
@@ -475,6 +477,13 @@ class WalletService:
                 idempotency_key=idempotency_key,
             )
         except Exception as e:
+            if self._is_ambiguous_submission_error(e):
+                raise PaymentOutcomeUnknownError(
+                    "Transfer submission outcome is unknown.",
+                    recipient=destination_address,
+                    amount=amount_decimal,
+                    details={"idempotency_key": idempotency_key},
+                ) from e
             return TransferResult(
                 success=False,
                 error=str(e),
@@ -518,11 +527,36 @@ class WalletService:
 
             elapsed = time.time() - start_time
             if elapsed >= timeout_seconds:
-                return tx
+                state = tx.state.value if hasattr(tx.state, "value") else str(tx.state)
+                raise TransactionTimeoutError(
+                    "Transaction did not reach a terminal state before timeout.",
+                    transaction_id=transaction_id,
+                    last_state=state,
+                    timeout_seconds=timeout_seconds,
+                )
 
             await asyncio.sleep(poll_interval)
 
     # ==================== Utility Methods ====================
+
+    @staticmethod
+    def _is_ambiguous_submission_error(error: Exception) -> bool:
+        """Return true when a transfer request may have reached the provider."""
+        message = str(error).lower()
+        return any(
+            token in message
+            for token in (
+                "timeout",
+                "connection",
+                "network",
+                "temporarily unavailable",
+                "rate limit",
+                "500",
+                "502",
+                "503",
+                "504",
+            )
+        )
 
     def get_or_create_default_wallet_set(
         self,

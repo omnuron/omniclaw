@@ -10,7 +10,11 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from omniclaw.core.exceptions import PaymentOutcomeUnknownError, TransactionTimeoutError
+from omniclaw.core.exceptions import (
+    PaymentError,
+    PaymentOutcomeUnknownError,
+    TransactionTimeoutError,
+)
 
 try:
     from tenacity import (
@@ -35,23 +39,15 @@ except ImportError:
 
 
 def is_transient_error(exception: Exception) -> bool:
-    """Check if exception is a transient network/infrastructure error."""
-    if isinstance(exception, (PaymentOutcomeUnknownError, TransactionTimeoutError)):
+    """Check whether an exception is explicitly safe to retry.
+
+    Payment execution retries must not infer safety from generic timeout strings. Callers
+    can mark pre-submission operations with ``retry_safe=True`` when a repeated attempt
+    cannot create another economic action.
+    """
+    if isinstance(exception, PaymentOutcomeUnknownError | TransactionTimeoutError | PaymentError):
         return False
-    msg = str(exception).lower()
-    return any(
-        x in msg
-        for x in [
-            "timeout",
-            "connection refused",
-            "500",
-            "502",
-            "503",
-            "504",
-            "network error",
-            "rate limit",  # Sometimes retryable with backoff
-        ]
-    )
+    return bool(getattr(exception, "retry_safe", False))
 
 
 # Standard Retry Policy

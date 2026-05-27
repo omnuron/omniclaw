@@ -81,7 +81,6 @@ class PaymentIntentFacade:
             destination_chain=destination_chain,
             skip_guards=skip_guards,
             check_trust=check_trust,
-            validate_recipient=False,
             **kwargs,
         )
 

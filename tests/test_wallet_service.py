@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from omniclaw.core.config import Config
-from omniclaw.core.exceptions import InsufficientBalanceError, WalletError
+from omniclaw.core.exceptions import (
+    InsufficientBalanceError,
+    PaymentOutcomeUnknownError,
+    TransactionTimeoutError,
+    WalletError,
+)
 from omniclaw.core.types import (
     AccountType,
     Balance,
@@ -457,6 +462,40 @@ class TestTransferOperations:
         )
 
         assert result.success is True
+
+    async def test_transfer_raises_outcome_unknown_for_ambiguous_submission_error(
+        self,
+        wallet_service: WalletService,
+        mock_circle_client: MagicMock,
+    ) -> None:
+        """Test ambiguous provider submission failures are not treated as final failures."""
+        mock_circle_client.find_usdc_token_id.return_value = "usdc-token-id"
+        mock_circle_client.create_transfer.side_effect = TimeoutError("request timeout")
+
+        with pytest.raises(PaymentOutcomeUnknownError):
+            await wallet_service.transfer(
+                wallet_id="wallet-123",
+                destination_address="0xdest...",
+                amount=Decimal("10.00"),
+                check_balance=False,
+                idempotency_key="transfer-1",
+            )
+
+    async def test_wait_for_transaction_timeout_raises_non_terminal_status(
+        self,
+        wallet_service: WalletService,
+        mock_circle_client: MagicMock,
+    ) -> None:
+        """Test polling timeout reports an unknown final settlement outcome."""
+        mock_circle_client.get_transaction.return_value = TransactionInfo(
+            id="tx-timeout",
+            state=TransactionState.INITIATED,
+        )
+
+        with pytest.raises(TransactionTimeoutError) as exc_info:
+            await wallet_service._wait_for_transaction("tx-timeout", timeout_seconds=0)
+
+        assert exc_info.value.transaction_id == "tx-timeout"
 
 
 class TestUtilityMethods:

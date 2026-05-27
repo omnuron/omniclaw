@@ -91,6 +91,8 @@ class BuyerAuditLog:
         intent_id: str | None = None,
         ledger_entry_id: str | None = None,
         correlation_id: str | None = None,
+        limit: int = 100,
+        allow_unfiltered: bool = False,
     ) -> list[AuditEvent]:
         filters: dict[str, Any] = {}
         if wallet_id:
@@ -102,7 +104,14 @@ class BuyerAuditLog:
         if correlation_id:
             filters["correlation_id"] = correlation_id
 
-        raw_events = await self._storage.query(self.COLLECTION, filters=filters or None, limit=None)
+        if not filters and not allow_unfiltered:
+            raise ValueError("At least one audit trace selector is required.")
+
+        raw_events = await self._storage.query(
+            self.COLLECTION,
+            filters=filters or None,
+            limit=limit,
+        )
         events = [AuditEvent.from_dict(event) for event in raw_events]
         events.sort(key=lambda event: event.timestamp)
         return events
