@@ -1997,6 +1997,13 @@ class OmniClaw:
                 # Auto-cancel expired intent and release reservation
                 await self._reservation.release(intent.id)
                 await self._intent_service.cancel(intent.id, reason="Expired")
+                await self._audit.record(
+                    "intent.expired",
+                    wallet_id=intent.wallet_id,
+                    intent_id=intent.id,
+                    correlation_id=(intent.metadata or {}).get("idempotency_key"),
+                    payload={"expires_at": intent.expires_at.isoformat()},
+                )
                 raise ValidationError(f"Intent expired at {intent.expires_at}")
 
         try:
@@ -2033,13 +2040,34 @@ class OmniClaw:
 
             if result.success:
                 await self._intent_service.update_status(intent.id, PaymentIntentStatus.SUCCEEDED)
+                await self._audit.record(
+                    "intent.succeeded",
+                    wallet_id=intent.wallet_id,
+                    intent_id=intent.id,
+                    correlation_id=idempotency_key,
+                    payload={"status": result.status.value},
+                )
             elif result.status == PaymentStatus.OUTCOME_UNKNOWN:
                 await self._intent_service.update_status(
                     intent.id, PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK
                 )
+                await self._audit.record(
+                    "intent.settlement_check_required",
+                    wallet_id=intent.wallet_id,
+                    intent_id=intent.id,
+                    correlation_id=idempotency_key,
+                    payload={"status": result.status.value},
+                )
             else:
                 await self._reservation.release(intent.id)
                 await self._intent_service.update_status(intent.id, PaymentIntentStatus.FAILED)
+                await self._audit.record(
+                    "intent.failed",
+                    wallet_id=intent.wallet_id,
+                    intent_id=intent.id,
+                    correlation_id=idempotency_key,
+                    payload={"status": result.status.value, "error": result.error},
+                )
 
             return result
 
@@ -2048,10 +2076,24 @@ class OmniClaw:
                 await self._intent_service.update_status(
                     intent.id, PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK
                 )
+                await self._audit.record(
+                    "intent.settlement_check_required",
+                    wallet_id=intent.wallet_id,
+                    intent_id=intent.id,
+                    correlation_id=(intent.metadata or {}).get("idempotency_key"),
+                    payload={"error": str(e)},
+                )
                 raise e
             # Mark failed on exception
             await self._reservation.release(intent.id)
             await self._intent_service.update_status(intent.id, PaymentIntentStatus.FAILED)
+            await self._audit.record(
+                "intent.failed",
+                wallet_id=intent.wallet_id,
+                intent_id=intent.id,
+                correlation_id=(intent.metadata or {}).get("idempotency_key"),
+                payload={"error": str(e)},
+            )
             raise e
 
     async def get_payment_intent(self, intent_id: str) -> PaymentIntent | None:
@@ -2075,7 +2117,15 @@ class OmniClaw:
         # Layer 2: Release reserved funds
         await self._reservation.release(intent.id)
 
-        return await self._intent_service.cancel(intent.id, reason=reason)
+        cancelled = await self._intent_service.cancel(intent.id, reason=reason)
+        await self._audit.record(
+            "intent.cancelled",
+            wallet_id=intent.wallet_id,
+            intent_id=intent.id,
+            correlation_id=(intent.metadata or {}).get("idempotency_key"),
+            payload={"reason": reason},
+        )
+        return cancelled
 
     async def approve_payment_intent_review(
         self,
@@ -2097,6 +2147,13 @@ class OmniClaw:
         metadata["trust_review_approved_at"] = datetime.now(timezone.utc).isoformat()
         intent.metadata = metadata
         await self._intent_service._save(intent)
+        await self._audit.record(
+            "intent.review_approved",
+            wallet_id=intent.wallet_id,
+            intent_id=intent.id,
+            correlation_id=metadata.get("idempotency_key"),
+            payload={"approved_by": approved_by, "reason": reason or ""},
+        )
         return intent
 
     async def batch_pay(
@@ -2190,6 +2247,14 @@ class OmniClaw:
             return
         if intent.status == PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK:
             await self._intent_service.update_status(intent_id, target_status)
+            await self._audit.record(
+                "intent.settlement_resolved",
+                wallet_id=entry.wallet_id,
+                intent_id=intent_id,
+                ledger_entry_id=entry.id,
+                correlation_id=metadata.get("idempotency_key"),
+                payload={"settled": settled, "target_status": target_status.value},
+            )
 
     async def list_pending_settlements(
         self,

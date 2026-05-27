@@ -200,9 +200,20 @@ async def test_buyer_audit_trace_reconstructs_intent_authorization_chain(client)
     assert "payment.requested" in event_types
     assert "execution.attempted" in event_types
     assert "payment.outcome_recorded" in event_types
+    assert "intent.succeeded" in event_types
 
     authorized = next(event for event in trace if event.event_type == "intent.authorized")
     assert authorized.payload["authorization_digest"] == intent.metadata["authorization_digest"]
+    assert all(event.event_hash for event in trace)
+    assert await client.audit.verify_wallet_chain("wallet-audit")
+
+    await client._storage.update(
+        client.audit.COLLECTION,
+        trace[0].id,
+        {"payload": {"tampered": True}},
+    )
+    tampered_trace = await client.audit.trace(wallet_id="wallet-audit")
+    assert not client.audit.verify_events(tampered_trace)
 
 
 @pytest.mark.asyncio
@@ -218,3 +229,42 @@ async def test_buyer_audit_trace_requires_selector_by_default(client):
         await client.audit.trace()
 
     assert await client.audit.trace(allow_unfiltered=True)
+
+
+@pytest.mark.asyncio
+async def test_intent_cancel_and_review_approval_are_audited(client):
+    cancel_intent = await client.intent.create(
+        wallet_id="wallet-audit-cancel",
+        recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0",
+        amount="2.00",
+        purpose="cancel audit",
+    )
+
+    await client.intent.cancel(cancel_intent.id, reason="operator stopped payment")
+
+    cancel_trace = await client.audit.trace(intent_id=cancel_intent.id)
+    assert "intent.cancelled" in [event.event_type for event in cancel_trace]
+
+    async def held_simulate(*args, **kwargs):
+        return SimulationResult(
+            would_succeed=False,
+            route=PaymentMethod.TRANSFER,
+            reason="Trust Gate: HELD for manual approval",
+        )
+
+    client._router.simulate = held_simulate
+    review_intent = await client.intent.create(
+        wallet_id="wallet-audit-review",
+        recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0",
+        amount="3.00",
+        purpose="review audit",
+    )
+
+    await client.approve_payment_intent_review(
+        review_intent.id,
+        approved_by="operator-1",
+        reason="known counterparty",
+    )
+
+    review_trace = await client.audit.trace(intent_id=review_intent.id)
+    assert "intent.review_approved" in [event.event_type for event in review_trace]
