@@ -31,6 +31,7 @@ class LedgerEntryStatus(str, Enum):
     """Status of ledger entries."""
 
     PENDING = "pending"
+    OUTCOME_UNKNOWN = "outcome_unknown"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"

@@ -114,6 +114,16 @@ class PaymentIntentService:
         await self._save(intent)
         return intent
 
+    async def update_metadata(self, intent_id: str, metadata: dict[str, Any]) -> PaymentIntent:
+        """Merge metadata into a stored payment intent."""
+        intent = await self.get(intent_id)
+        if not intent:
+            raise ValidationError(f"Intent not found: {intent_id}")
+
+        intent.metadata.update(metadata)
+        await self._save(intent)
+        return intent
+
     async def cancel(self, intent_id: str, reason: str | None = None) -> PaymentIntent:
         """
         Cancel a payment intent.
