@@ -48,6 +48,7 @@ from omniclaw.protocols.nanopayments.exceptions import (
 )
 from omniclaw.protocols.nanopayments.signing import EIP3009Signer
 from omniclaw.protocols.nanopayments.types import (
+    GatewayBalance,
     NanopaymentResult,
     PaymentPayload,
     PaymentRequirements,
@@ -277,6 +278,7 @@ class NanopaymentAdapter:
         retry_attempts: int = 3,
         retry_base_delay: float = 0.5,
         strict_settlement: bool = False,
+        rpc_url: str | None = None,
     ) -> None:
         self._signer = signer
         self._network = network
@@ -289,6 +291,7 @@ class NanopaymentAdapter:
         self._retry_attempts = retry_attempts
         self._retry_base_delay = retry_base_delay
         self._strict_settlement = strict_settlement
+        self._rpc_url = rpc_url
 
     @property
     def address(self) -> str:
@@ -390,6 +393,150 @@ class NanopaymentAdapter:
         )
         return base64.b64encode(json.dumps(payment_payload).encode("utf-8")).decode("ascii")
 
+    @staticmethod
+    def _extra_value(gateway_kind: Any, key: str, snake_key: str | None = None) -> Any:
+        extra = getattr(gateway_kind, "extra", None) or {}
+        if isinstance(extra, dict):
+            return extra.get(key) or (extra.get(snake_key) if snake_key else None)
+        return getattr(extra, snake_key or key, None)
+
+    @staticmethod
+    def _kind_value(gateway_kind: Any, key: str, fallback: str | None = None) -> Any:
+        value = getattr(gateway_kind, key, None)
+        if value is not None:
+            return value
+        if fallback:
+            return getattr(gateway_kind, fallback, None)
+        return None
+
+    async def _gateway_verifying_contract(self, gateway_kind: Any) -> str:
+        verifying_contract = self._extra_value(
+            gateway_kind,
+            "verifyingContract",
+            "verifying_contract",
+        )
+        if verifying_contract:
+            return str(verifying_contract)
+        network = str(self._kind_value(gateway_kind, "network") or "")
+        if self._client.has_api_key:
+            return await self._client.get_verifying_contract(network)
+        raise GatewayAPIError(
+            message=(
+                "Seller x402 Gateway requirement did not include extra.verifyingContract, "
+                "and CIRCLE_API_KEY is not configured to resolve it from Circle Gateway."
+            ),
+            status_code=0,
+            response_body=None,
+        )
+
+    async def get_onchain_available_balance(
+        self,
+        gateway_kind: Any,
+    ) -> GatewayBalance:
+        """Read GatewayWalletBatched balance directly from the Gateway contract."""
+        verifying_contract = await self._gateway_verifying_contract(gateway_kind)
+        available = await self._get_onchain_available_atomic(
+            gateway_kind=gateway_kind,
+            verifying_contract=verifying_contract,
+        )
+        formatted = f"{Decimal(available) / Decimal(1_000_000):.6f} USDC"
+        return GatewayBalance(
+            total=available,
+            available=available,
+            formatted_total=formatted,
+            formatted_available=formatted,
+        )
+
+    async def _gateway_available_balance(
+        self,
+        gateway_kind: Any,
+    ) -> GatewayBalance:
+        api_balance: GatewayBalance | None = None
+        required_atomic = int(str(self._kind_value(gateway_kind, "amount") or "0"))
+        if self._client.has_api_key:
+            try:
+                api_balance = await self._client.check_balance(
+                    address=self._get_address(),
+                    network=str(self._kind_value(gateway_kind, "network") or ""),
+                )
+                if api_balance.available >= required_atomic:
+                    return api_balance
+            except Exception as exc:
+                logger.warning("Gateway API balance check failed; falling back on-chain: %s", exc)
+
+        try:
+            onchain_balance = await self.get_onchain_available_balance(gateway_kind)
+            if api_balance is None or onchain_balance.available > api_balance.available:
+                return onchain_balance
+        except Exception:
+            if api_balance is None:
+                raise
+
+        return api_balance
+
+    async def _get_onchain_available_atomic(
+        self,
+        *,
+        gateway_kind: Any,
+        verifying_contract: str,
+    ) -> int:
+        if not self._rpc_url:
+            raise GatewayAPIError(
+                message=(
+                    "OMNICLAW_RPC_URL is required to check x402 Gateway balance without "
+                    "CIRCLE_API_KEY."
+                ),
+                status_code=0,
+                response_body=None,
+            )
+        usdc_address = self._kind_value(gateway_kind, "asset")
+        if not usdc_address:
+            raise GatewayAPIError(
+                message=(
+                    "Seller x402 Gateway requirement did not include the USDC asset address; "
+                    "cannot check Gateway balance without Circle API metadata."
+                ),
+                status_code=0,
+                response_body=None,
+            )
+        try:
+            from web3 import Web3
+
+            w3 = Web3(Web3.HTTPProvider(self._rpc_url))
+            gateway = w3.eth.contract(
+                address=Web3.to_checksum_address(verifying_contract),
+                abi=[
+                    {
+                        "inputs": [
+                            {"internalType": "address", "name": "token", "type": "address"},
+                            {
+                                "internalType": "address",
+                                "name": "depositor",
+                                "type": "address",
+                            },
+                        ],
+                        "name": "availableBalance",
+                        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                        "stateMutability": "view",
+                        "type": "function",
+                    }
+                ],
+            )
+            return int(
+                gateway.functions.availableBalance(
+                    Web3.to_checksum_address(usdc_address),
+                    Web3.to_checksum_address(self._get_address()),
+                ).call()
+            )
+        except GatewayAPIError:
+            raise
+        except Exception as exc:
+            raise GatewayAPIError(
+                message=f"Gateway on-chain balance check failed: {exc}",
+                status_code=0,
+                response_body=str(exc),
+            ) from exc
+
     # -------------------------------------------------------------------------
     # x402 URL payment
     # -------------------------------------------------------------------------
@@ -399,7 +546,8 @@ class NanopaymentAdapter:
         url: str,
         method: str = "GET",
         headers: dict | None = None,
-        body: bytes | None = None,
+        body: bytes | str | None = None,
+        max_amount_usdc: str | Decimal | None = None,
     ) -> NanopaymentResult:
         """
         Pay for a URL-based resource via x402 with Gateway batching.
@@ -531,11 +679,7 @@ class NanopaymentAdapter:
         raw_gateway_kind = _find_raw_gateway_kind(req_data) or gateway_kind.to_dict()
 
         # Step 5: Get verifying contract if missing
-        verifying_contract = gateway_kind.extra.verifying_contract
-        if not verifying_contract:
-            verifying_contract = await self._client.get_verifying_contract(
-                gateway_kind.network,
-            )
+        verifying_contract = await self._gateway_verifying_contract(gateway_kind)
         raw_gateway_kind = _with_gateway_verifying_contract(raw_gateway_kind, verifying_contract)
 
         # Build updated requirements with verifying contract
@@ -557,12 +701,18 @@ class NanopaymentAdapter:
                 verifying_contract=verifying_contract,
             ),
         )
+        if max_amount_usdc is not None:
+            payment_amount_usdc = Decimal(str(updated_kind.amount)) / Decimal(1_000_000)
+            if payment_amount_usdc > Decimal(str(max_amount_usdc)):
+                raise InsufficientBalanceError(
+                    reason=(
+                        f"x402 price {payment_amount_usdc} exceeds max amount {max_amount_usdc}"
+                    ),
+                    payer=self._get_address(),
+                )
         # Step 6: Check balance - FAIL if insufficient
         payer_address = self._get_address()
-        balance = await self._client.check_balance(
-            address=payer_address,
-            network=gateway_kind.network,
-        )
+        balance = await self._gateway_available_balance(gateway_kind)
         payment_amount_atomic = int(updated_kind.amount)
         if balance.available < payment_amount_atomic:
             raise InsufficientBalanceError(
@@ -707,6 +857,16 @@ class NanopaymentAdapter:
         Raises:
             SettlementError: On payment settlement failure.
         """
+        if not self._client.has_api_key:
+            raise GatewayAPIError(
+                message=(
+                    "Direct address Gateway settlement requires CIRCLE_API_KEY. "
+                    "Use an x402 URL seller flow, or configure Circle API credentials for "
+                    "direct Gateway settlement."
+                ),
+                status_code=0,
+                response_body=None,
+            )
         # Step 1: Resolve contract addresses
         verifying_contract = await self._client.get_verifying_contract(network)
         usdc_address = await self._client.get_usdc_address(network)
@@ -1042,6 +1202,8 @@ class NanopaymentProtocolAdapter:
             return preferred_url_route != "x402"
         # EVM address below micro threshold
         if _is_address(recipient):
+            if not self._adapter._client.has_api_key:
+                return False
             amount = kwargs.get("amount")
             if amount is not None:
                 threshold = Decimal(self._micro_threshold)
@@ -1083,8 +1245,20 @@ class NanopaymentProtocolAdapter:
         strict_settlement = bool(getattr(self._adapter, "_strict_settlement", False))
         try:
             if _is_url(recipient):
+                request_method = str(kwargs.get("http_method", kwargs.get("method", "GET")))
+                request_headers = kwargs.get("request_headers") or kwargs.get("headers")
+                request_body = kwargs.get("request_body", kwargs.get("body"))
+                request_json = kwargs.get("request_json")
+                if request_body is None and request_json is not None:
+                    request_body = json.dumps(request_json)
+                    request_headers = dict(request_headers or {})
+                    request_headers.setdefault("content-type", "application/json")
                 result = await self._adapter.pay_x402_url(
                     url=recipient,
+                    method=request_method,
+                    headers=request_headers,
+                    body=request_body,
+                    max_amount_usdc=str(amount),
                 )
             else:
                 # Address payment below micro threshold
@@ -1121,6 +1295,12 @@ class NanopaymentProtocolAdapter:
                 resource_data=result.response_data,
                 metadata={
                     "nanopayment": True,
+                    "selected_route": "nanopayment" if _is_url(recipient) else "gateway",
+                    "payment_source": "gateway_balance" if _is_url(recipient) else "gateway",
+                    "execution_route": (
+                        "GatewayWalletBatched" if _is_url(recipient) else "direct_gateway"
+                    ),
+                    "facilitator": "GatewayWalletBatched" if _is_url(recipient) else None,
                     "payer": result.payer,
                     "seller": result.seller,
                     "amount_atomic": result.amount_atomic,

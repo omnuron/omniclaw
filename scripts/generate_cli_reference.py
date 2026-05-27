@@ -21,7 +21,10 @@ COMMANDS = [
     ("omniclaw-cli deposit --help", ["omniclaw-cli", "deposit", "--help"]),
     ("omniclaw-cli withdraw --help", ["omniclaw-cli", "withdraw", "--help"]),
     ("omniclaw-cli withdraw-trustless --help", ["omniclaw-cli", "withdraw-trustless", "--help"]),
-    ("omniclaw-cli withdraw-trustless-complete --help", ["omniclaw-cli", "withdraw-trustless-complete", "--help"]),
+    (
+        "omniclaw-cli withdraw-trustless-complete --help",
+        ["omniclaw-cli", "withdraw-trustless-complete", "--help"],
+    ),
     ("omniclaw-cli create-intent --help", ["omniclaw-cli", "create-intent", "--help"]),
     ("omniclaw-cli confirm-intent --help", ["omniclaw-cli", "confirm-intent", "--help"]),
     ("omniclaw-cli get-intent --help", ["omniclaw-cli", "get-intent", "--help"]),
@@ -30,7 +33,10 @@ COMMANDS = [
     ("omniclaw-cli list-tx --help", ["omniclaw-cli", "list-tx", "--help"]),
     ("omniclaw-cli confirmations --help", ["omniclaw-cli", "confirmations", "--help"]),
     ("omniclaw-cli confirmations get --help", ["omniclaw-cli", "confirmations", "get", "--help"]),
-    ("omniclaw-cli confirmations approve --help", ["omniclaw-cli", "confirmations", "approve", "--help"]),
+    (
+        "omniclaw-cli confirmations approve --help",
+        ["omniclaw-cli", "confirmations", "approve", "--help"],
+    ),
     ("omniclaw-cli confirmations deny --help", ["omniclaw-cli", "confirmations", "deny", "--help"]),
 ]
 

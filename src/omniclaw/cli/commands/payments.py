@@ -13,7 +13,7 @@ from ..config import get_client, is_quiet
 def pay(
     recipient: str = typer.Option(..., "--recipient", help="Payment recipient (address or URL)"),
     amount: str | None = typer.Option(
-        None, "--amount", help="Amount in USDC (optional for x402 URLs)"
+        None, "--amount", help="Amount in USDC; maximum amount for x402 URLs"
     ),
     purpose: str | None = typer.Option(None, "--purpose", help="Payment purpose"),
     idempotency_key: str | None = typer.Option(None, "--idempotency-key", help="Idempotency key"),
@@ -33,6 +33,17 @@ def pay(
 ) -> dict[str, Any]:
     """Execute a payment or pay for an x402 service."""
     if dry_run:
+        if recipient.startswith("http"):
+            data = inspect_x402(
+                recipient=recipient,
+                amount=amount,
+                method=method,
+                body=body,
+                header=header,
+            )
+            if data.get("buyer_ready") is False:
+                raise typer.Exit(1)
+            return data
         return simulate(
             recipient=recipient,
             amount=amount or "0.00",
@@ -43,7 +54,7 @@ def pay(
             skip_guards=skip_guards,
         )
 
-    client = get_client()
+    client = get_client(owner=skip_guards)
 
     parsed_headers: dict[str, str] | None = None
     if header:
@@ -108,7 +119,11 @@ def pay(
             if not is_quiet():
                 typer.echo(f"Response saved to {output}")
         typer.echo(json.dumps(data, indent=2))
+        if data.get("success") is False and not requires_confirmation:
+            raise typer.Exit(1)
         return data
+    except typer.Exit:
+        raise
     except httpx.HTTPStatusError as e:
         typer.echo(f"Error: {e.response.json().get('detail', str(e))}", err=True)
         raise typer.Exit(1) from e
@@ -131,7 +146,7 @@ def simulate(
     skip_guards: bool = typer.Option(False, "--skip-guards", help="Skip guards (OWNER ONLY)"),
 ) -> dict[str, Any]:
     """Simulate a payment without executing."""
-    client = get_client()
+    client = get_client(owner=skip_guards)
 
     payload: dict[str, Any] = {
         "recipient": recipient,
@@ -153,7 +168,11 @@ def simulate(
         response.raise_for_status()
         data = response.json()
         typer.echo(json.dumps(data, indent=2))
+        if data.get("would_succeed") is False:
+            raise typer.Exit(1)
         return data
+    except typer.Exit:
+        raise
     except httpx.HTTPStatusError as e:
         typer.echo(f"Error: {e.response.json().get('detail', str(e))}", err=True)
         raise typer.Exit(1) from e

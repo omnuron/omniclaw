@@ -440,15 +440,29 @@ class NanopaymentClient:
             GATEWAY_API_TESTNET if env == "testnet" else GATEWAY_API_MAINNET
         )
         self._api_key = api_key or os.environ.get("CIRCLE_API_KEY", "")
-        if not self._api_key:
-            raise ValueError(
-                "Circle API key is required. Set CIRCLE_API_KEY or pass api_key explicitly."
-            )
         self._timeout = timeout
 
         # Supported networks cache
         self._supported_cache: list[SupportedKind] | None = None
         self._supported_cache_time: float = 0.0
+
+    @property
+    def has_api_key(self) -> bool:
+        """Return whether Circle Gateway REST API helper calls can be made."""
+        return bool(self._api_key)
+
+    def _require_api_key(self, operation: str) -> None:
+        if self._api_key:
+            return
+        raise GatewayAPIError(
+            message=(
+                f"{operation} requires CIRCLE_API_KEY. x402 Gateway URL payments can sign "
+                "with OMNICLAW_PRIVATE_KEY without Circle API credentials when the seller "
+                "provides Gateway contract metadata."
+            ),
+            status_code=0,
+            response_body=None,
+        )
 
     # -------------------------------------------------------------------------
     # Supported networks (with in-memory cache)
@@ -474,6 +488,7 @@ class NanopaymentClient:
             GatewayAPIError: On HTTP errors from Circle.
             GatewayTimeoutError: On request timeout.
         """
+        self._require_api_key("Fetching Circle Gateway supported networks")
         now = time.monotonic()
         cache_valid = (
             self._supported_cache is not None
@@ -599,6 +614,7 @@ class NanopaymentClient:
         Raises:
             GatewayAPIError: On HTTP errors.
         """
+        self._require_api_key("Verifying a Gateway payment through Circle API")
         circle_payload = _convert_payload_for_circle(payload.to_dict())
         circle_requirements = _convert_requirements_for_circle(requirements.to_dict())
         selected_requirement = (
@@ -665,6 +681,7 @@ class NanopaymentClient:
             GatewayAPIError: On HTTP-level errors (auth failure, etc.).
             GatewayTimeoutError: On request timeout.
         """
+        self._require_api_key("Settling a direct Gateway payment through Circle API")
         # Convert to Circle API format
         payload_dict = payload.to_dict()
         req_dict = requirements.to_dict()
@@ -760,6 +777,7 @@ class NanopaymentClient:
             UnsupportedNetworkError: If the network is not supported.
             GatewayAPIError: On HTTP errors.
         """
+        self._require_api_key("Checking Gateway balance through Circle API")
         await self.get_supported()
 
         expected_domain = _caip2_to_circle_domain_id(network)

@@ -23,4 +23,4 @@ EXPOSE 9090
 
 ENV OMNICLAW_AGENT_PORT=9090
 
-CMD ["uv", "run", "omniclaw", "server", "--host", "0.0.0.0", "--port", "9090"]
+CMD ["uv", "run", "uvicorn", "omniclaw.agent.server:app", "--host", "0.0.0.0", "--port", "9090"]

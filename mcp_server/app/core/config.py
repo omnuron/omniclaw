@@ -73,11 +73,15 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_auth_configuration(self) -> "Settings":
-        if self.MCP_REQUIRE_AUTH and self.MCP_AUTH_ENABLED:
-            if not self.MCP_AUTH_TOKEN and not self.MCP_JWT_SECRET:
-                raise ValueError(
-                    "MCP authentication is enabled and required, but no MCP_AUTH_TOKEN or MCP_JWT_SECRET is configured."
-                )
+        if (
+            self.MCP_REQUIRE_AUTH
+            and self.MCP_AUTH_ENABLED
+            and not self.MCP_AUTH_TOKEN
+            and not self.MCP_JWT_SECRET
+        ):
+            raise ValueError(
+                "MCP authentication is enabled and required, but no MCP_AUTH_TOKEN or MCP_JWT_SECRET is configured."
+            )
         return self
 
     model_config = SettingsConfigDict(

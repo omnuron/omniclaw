@@ -47,6 +47,11 @@ logs/
 tmp/
 .runtime/
 output/doc/
+examples/agent/buyer/policy.json
+examples/agent/buyer/*.state.json
+examples/agent/buyer/wallet-state.json
+examples/agent/buyer/runtime/
+examples/agent/runtime/
 
 # Private operating workspace
 # Keep the root internal workspace out of git.

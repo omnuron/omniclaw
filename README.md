@@ -32,27 +32,44 @@ pip install omniclaw
 Start the policy engine:
 
 ```bash
-export OMNICLAW_PRIVATE_KEY="0x..."
-export OMNICLAW_AGENT_TOKEN="agent-token"
-export OMNICLAW_AGENT_POLICY_PATH="./policy.json"
-export OMNICLAW_NETWORK="BASE-SEPOLIA"
-export OMNICLAW_RPC_URL="https://sepolia.base.org"
+cp .env.example .env
+# Hybrid mode (default): leave OMNICLAW_BUYER_MODE=hybrid and fill CIRCLE_API_KEY,
+# ENTITY_SECRET, OMNICLAW_PRIVATE_KEY, OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN,
+# OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
+# x402-only Gateway mode: set OMNICLAW_BUYER_MODE=x402, leave CIRCLE_API_KEY and
+# ENTITY_SECRET empty unless you need optional Circle Gateway API helpers, and fill
+# OMNICLAW_PRIVATE_KEY, OMNICLAW_AGENT_TOKEN, OMNICLAW_OWNER_TOKEN,
+# OMNICLAW_NETWORK, and OMNICLAW_RPC_URL.
 
-docker compose up --build omniclaw-agent
+mkdir -p examples/agent/buyer/runtime
+cp examples/agent/buyer/policy.example.json examples/agent/buyer/runtime/policy.json
+# Edit examples/agent/buyer/runtime/policy.json so the token matches OMNICLAW_AGENT_TOKEN.
+
+docker compose -f examples/agent/buyer/docker-compose.yml --env-file .env up --build
 ```
+
+The policy file is stable configuration. Generated wallet state is written separately
+to `examples/agent/buyer/runtime/wallet-state.json`.
+
+Buyer-facing policy rails are:
+
+- `circle_transfer` for direct Circle Developer Wallet transfers.
+- `x402` for paid API payments. OmniClaw chooses Gateway nanopayment or the standard
+  x402 payment path internally based on seller accepts, buyer config, and Gateway balance.
 
 Configure the buyer CLI:
 
 ```bash
-export OMNICLAW_SERVER_URL="http://localhost:8080"
-export OMNICLAW_TOKEN="agent-token"
+set -a; source .env; set +a
+export OMNICLAW_SERVER_URL="http://127.0.0.1:9091"
+export OMNICLAW_TOKEN="$OMNICLAW_AGENT_TOKEN"
 ```
 
 Inspect and pay an x402 endpoint:
 
 ```bash
-omniclaw-cli inspect-x402 --recipient https://paid.example.com/compute
-omniclaw-cli pay --recipient https://paid.example.com/compute --idempotency-key job-123
+omniclaw-cli inspect-x402 --recipient "http://127.0.0.1:4023/compute?size=20"
+omniclaw-cli pay --recipient "http://127.0.0.1:4023/compute?size=20" --amount 0.10 --idempotency-key job-123
 ```
 
 ## Development

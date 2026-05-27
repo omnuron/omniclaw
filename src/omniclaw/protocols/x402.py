@@ -496,10 +496,24 @@ class X402Adapter(ProtocolAdapter):
                 return source_network
             return Network.from_string(str(source_network))
 
+        configured_network = getattr(self._config, "network", None)
+        if not bool(getattr(self._config, "enable_circle_transfer", True)) and configured_network:
+            return (
+                configured_network
+                if isinstance(configured_network, Network)
+                else Network.from_string(str(configured_network))
+            )
+
         try:
             agent_wallet = self._wallet_service.get_wallet(wallet_id)
             return Network.from_string(agent_wallet.blockchain)
         except Exception:
+            if configured_network:
+                return (
+                    configured_network
+                    if isinstance(configured_network, Network)
+                    else Network.from_string(str(configured_network))
+                )
             return None
 
     def _get_generic_x402_private_key(self) -> str:

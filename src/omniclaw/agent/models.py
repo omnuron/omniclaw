@@ -36,6 +36,10 @@ class PayResponse(BaseModel):
     recipient: str
     status: str
     method: str
+    selected_route: str | None = None
+    payment_source: str | None = None
+    execution_route: str | None = None
+    facilitator: str | None = None
     error: str | None = None
     requires_confirmation: bool = False
     confirmation_id: str | None = None
@@ -49,15 +53,22 @@ class BalanceResponse(BaseModel):
     available: str
     reserved: str | None = None
     total: str | None = None
+    source: str | None = None
+    note: str | None = None
 
 
 class SimulateRequest(BaseModel):
     """Simulation request."""
 
     recipient: str
-    amount: str
+    amount: str | None = None
     check_trust: bool = False
     skip_guards: bool = False
+    method: str = Field("GET", description="HTTP method for x402 URL payments")
+    body: str | None = Field(None, description="Request body for x402 URL payments")
+    headers: dict[str, str] | None = Field(
+        None, description="Request headers for x402 URL payments"
+    )
 
 
 class SimulateResponse(BaseModel):
@@ -196,6 +207,7 @@ class X402InspectResponse(BaseModel):
     router_detected_route: str | None = None
     selected_route: str | None = None
     payment_source: str | None = None
+    execution_route: str | None = None
     buyer_address: str | None = None
     gateway_available_balance: str | None = None
     selected_scheme: str | None = None

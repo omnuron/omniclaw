@@ -1,18 +1,18 @@
 {
   "version": "2.0",
   "tokens": {
-    "YOUR_AGENT_TOKEN": {
-      "wallet_alias": "primary",
+    "replace-with-agent-token": {
+      "wallet_alias": "payment-agent",
       "active": true,
-      "label": "Your Agent Name"
+      "label": "Payment Agent"
     }
   },
   "wallets": {
-    "primary": {
-      "name": "Primary Wallet",
+    "payment-agent": {
+      "name": "Payment Agent",
       "limits": {
         "daily_max": "100.00",
-        "per_tx_max": "50.00"
+        "per_tx_max": "10.00"
       },
       "recipients": {
         "mode": "allow_all"

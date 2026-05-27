@@ -16,6 +16,10 @@
       },
       "recipients": {
         "mode": "allow_all"
+      },
+      "rails": {
+        "circle_transfer": true,
+        "x402": true
       }
     }
   }

@@ -61,9 +61,14 @@ def balance_detail() -> dict[str, Any]:
         if is_quiet():
             typer.echo(json.dumps(data, indent=2))
         else:
+            gateway_balance = (
+                data.get("gateway_balance")
+                if data.get("gateway_balance_available")
+                else data.get("gateway_onchain_balance")
+            )
             typer.echo("=== WALLET BALANCE ===")
             typer.echo(f"EOA Address: {data.get('eoa_address')}")
-            typer.echo(f"Gateway Balance: {data.get('gateway_balance')} USDC")
+            typer.echo(f"Gateway Balance: {gateway_balance} USDC")
             typer.echo(f"Circle Wallet: {data.get('circle_wallet_balance')} USDC")
 
         return data
@@ -84,8 +89,37 @@ def balance_detail_alias() -> dict[str, Any]:
     return balance_detail()
 
 
+def deposit_address() -> dict[str, Any]:
+    """Get the EOA address to fund before Gateway deposits."""
+    client = get_client()
+
+    try:
+        response = client.get("/api/v1/deposit-address")
+        response.raise_for_status()
+        data = response.json()
+        typer.echo(json.dumps(data, indent=2))
+        return data
+    except httpx.HTTPStatusError as e:
+        typer.echo(f"Error: {e.response.json().get('detail', str(e))}", err=True)
+        raise typer.Exit(1) from e
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+
+def deposit_address_alias() -> dict[str, Any]:
+    """Alias for deposit-address."""
+    return deposit_address()
+
+
 def deposit(
     amount: str = typer.Option(..., "--amount", help="Amount in USDC to deposit to Gateway"),
+    check_gas: bool = typer.Option(False, "--check-gas", help="Check gas balance first"),
+    skip_if_insufficient_gas: bool = typer.Option(
+        True,
+        "--skip-if-insufficient-gas/--no-skip-if-insufficient-gas",
+        help="Skip deposit when gas is insufficient",
+    ),
 ) -> dict[str, Any]:
     """Deposit USDC from EOA to Gateway wallet."""
     client = get_client()
@@ -93,7 +127,11 @@ def deposit(
     try:
         response = client.post(
             "/api/v1/deposit",
-            params={"amount": amount},
+            params={
+                "amount": amount,
+                "check_gas": check_gas,
+                "skip_if_insufficient_gas": skip_if_insufficient_gas,
+            },
         )
         response.raise_for_status()
         data = response.json()
@@ -109,12 +147,21 @@ def deposit(
 
 def withdraw(
     amount: str = typer.Option(..., "--amount", help="Amount in USDC to withdraw from Gateway"),
+    destination_chain: str | None = typer.Option(
+        None, "--destination-chain", help="Optional CAIP-2 destination chain"
+    ),
+    recipient: str | None = typer.Option(None, "--recipient", help="Optional destination address"),
 ) -> dict[str, Any]:
     """Withdraw USDC from Gateway to Circle Developer Wallet."""
-    client = get_client()
+    client = get_client(owner=recipient is not None)
 
     try:
-        response = client.post("/api/v1/withdraw", params={"amount": amount})
+        params: dict[str, Any] = {"amount": amount}
+        if destination_chain:
+            params["destination_chain"] = destination_chain
+        if recipient:
+            params["recipient"] = recipient
+        response = client.post("/api/v1/withdraw", params=params)
         response.raise_for_status()
         data = response.json()
         typer.echo(json.dumps(data, indent=2))
@@ -183,6 +230,8 @@ def register(app: typer.Typer, group: typer.Typer) -> None:
     app.command()(balance)
     app.command("balance-detail")(balance_detail)
     app.command(name="balance_detail", help="Alias for balance-detail")(balance_detail_alias)
+    app.command("deposit-address")(deposit_address)
+    app.command(name="deposit_address", help="Alias for deposit-address")(deposit_address_alias)
     app.command()(deposit)
     app.command()(withdraw)
     app.command("withdraw-trustless")(withdraw_trustless)
@@ -198,6 +247,8 @@ def register(app: typer.Typer, group: typer.Typer) -> None:
     group.command()(balance)
     group.command("balance-detail")(balance_detail)
     group.command(name="balance_detail", help="Alias for balance-detail")(balance_detail_alias)
+    group.command("deposit-address")(deposit_address)
+    group.command(name="deposit_address", help="Alias for deposit-address")(deposit_address_alias)
     group.command()(deposit)
     group.command()(withdraw)
     group.command("withdraw-trustless")(withdraw_trustless)

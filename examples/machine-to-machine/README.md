@@ -22,12 +22,13 @@ https://api.paid-resource.example/compute
 Consumer service:
 
 ```bash
-export OMNICLAW_SERVER_URL="http://127.0.0.1:8080"
-export OMNICLAW_TOKEN="service-agent-token"
+set -a; source .env; set +a
+export OMNICLAW_SERVER_URL="http://127.0.0.1:9091"
+export OMNICLAW_TOKEN="$OMNICLAW_AGENT_TOKEN"
 
 omniclaw-cli can-pay --recipient https://api.paid-resource.example/compute
 omniclaw-cli inspect-x402 --recipient https://api.paid-resource.example/compute
-omniclaw-cli pay --recipient https://api.paid-resource.example/compute --idempotency-key batch-042
+omniclaw-cli pay --recipient https://api.paid-resource.example/compute --amount 0.10 --idempotency-key batch-042
 ```
 
 ## Service Contract

@@ -40,6 +40,11 @@ def create_app() -> FastAPI:
         from omniclaw import OmniClaw
         from omniclaw.core.types import Network
 
+        # The standalone SDK defaults to Circle-only for compatibility. The
+        # buyer server is a policy engine, so default it to the full buyer rail
+        # set unless the operator chooses a narrower mode.
+        os.environ.setdefault("OMNICLAW_BUYER_MODE", "hybrid")
+
         # Read network from environment
         network_str = os.getenv("OMNICLAW_NETWORK", "ETH-SEPOLIA")
         try:
@@ -128,6 +133,9 @@ def create_app() -> FastAPI:
         "private_key": os.environ.get("OMNICLAW_PRIVATE_KEY"),
         "rpc_url": os.environ.get("OMNICLAW_RPC_URL"),
         "nanopay_network": nanopay_network,
+        "gateway_contract_address": os.environ.get("CIRCLE_GATEWAY_CONTRACT"),
+        "gateway_usdc_address": os.environ.get("CIRCLE_GATEWAY_USDC_ADDRESS")
+        or os.environ.get("CIRCLE_GATEWAY_USDC_CONTRACT"),
     }
 
     return app

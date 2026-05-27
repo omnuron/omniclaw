@@ -5,13 +5,18 @@ services:
       dockerfile: Dockerfile.agent
     command: uv run uvicorn omniclaw.agent.server:app --host 0.0.0.0 --port 8080
     environment:
-      - 
-      - OMNICLAW_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-      - OMNICLAW_NETWORK=ETH-SEPOLIA
-      - OMNICLAW_STORAGE_BACKEND=memory
-      - OMNICLAW_AGENT_TOKEN=test-agent-token
+      - OMNICLAW_NETWORK=${OMNICLAW_NETWORK:-ETH-SEPOLIA}
+      - OMNICLAW_RPC_URL=${OMNICLAW_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}
+      - OMNICLAW_STORAGE_BACKEND=${OMNICLAW_STORAGE_BACKEND:-memory}
+      - OMNICLAW_BUYER_MODE=${OMNICLAW_BUYER_MODE:-x402}
+      - OMNICLAW_AGENT_TOKEN=${OMNICLAW_AGENT_TOKEN:-test-agent-token}
+      - OMNICLAW_OWNER_TOKEN=${OMNICLAW_OWNER_TOKEN:-}
       - OMNICLAW_AGENT_POLICY_PATH=/config/policy.json
+      - OMNICLAW_AGENT_STATE_PATH=/config/wallet-state.json
+      - CIRCLE_API_KEY=${CIRCLE_API_KEY:-}
+      - OMNICLAW_PRIVATE_KEY=${OMNICLAW_PRIVATE_KEY:-0x1111111111111111111111111111111111111111111111111111111111111111}
+      - ENTITY_SECRET=${ENTITY_SECRET:-}
     volumes:
-      - ./policy.json:/config/policy.json
+      - ./runtime:/config
     ports:
       - "9080:8080"

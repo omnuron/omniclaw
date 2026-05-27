@@ -50,10 +50,12 @@ class TestConfig:
 
     def test_missing_api_key_raises(self) -> None:
         """Test missing API key raises ValueError."""
-        with pytest.raises(ValueError, match="circle_api_key is required"):
+        with pytest.raises(ValueError, match="CIRCLE_API_KEY"):
             Config(
                 circle_api_key="",
                 entity_secret="test_secret",
+                buyer_mode="circle",
+                enable_circle_transfer=True,
             )
 
     def test_missing_entity_secret_warns(self) -> None:
@@ -62,6 +64,12 @@ class TestConfig:
         config = Config(
             circle_api_key="test_key",
             entity_secret="",
+            buyer_mode="x402",
+            enable_circle_transfer=False,
+            enable_gateway=False,
+            enable_x402_exact=True,
+            nanopayments_private_key="0x" + "1" * 64,
+            rpc_url="https://rpc.example",
         )
         assert config.entity_secret == ""
 
@@ -110,15 +118,174 @@ class TestConfig:
             Config.from_env()
 
     def test_from_env_missing_entity_secret_warns(self) -> None:
-        """Test from_env with missing entity secret logs warning (no longer required)."""
+        """x402 mode does not need Circle entity secret."""
         env_vars = {
             "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
             config = Config.from_env()
         assert config.entity_secret == ""
         assert config.circle_api_key == "test_key"
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402 is True
+
+    def test_x402_mode_does_not_require_circle_credentials(self) -> None:
+        """x402 mode can use EOA-backed x402 without Circle credentials."""
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.circle_api_key == ""
+        assert config.entity_secret == ""
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402_exact is True
+
+    def test_gateway_contract_overrides_are_loaded_from_env(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
+            "CIRCLE_GATEWAY_CONTRACT": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+            "CIRCLE_GATEWAY_USDC_ADDRESS": "0x3600000000000000000000000000000000000000",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.gateway_contract_address == "0x0077777d7EBA4688BDeF3E311b846F25870A19B9"
+        assert config.gateway_usdc_address == "0x3600000000000000000000000000000000000000"
+
+    def test_gateway_buyer_mode_is_not_accepted(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "gateway",
+            "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with (
+            patch.dict(os.environ, env_vars, clear=True),
+            pytest.raises(ValueError, match="hybrid, circle, x402"),
+        ):
+            Config.from_env()
+
+    def test_x402_mode_requires_rpc_url(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with (
+            patch.dict(os.environ, env_vars, clear=True),
+            pytest.raises(ValueError, match="OMNICLAW_RPC_URL"),
+        ):
+            Config.from_env()
+
+    def test_x402_public_flag_disables_internal_x402_paths(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "hybrid",
+            "CIRCLE_API_KEY": "test_key",
+            "ENTITY_SECRET": "test_secret",
+            "OMNICLAW_ENABLE_X402": "false",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is True
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is False
+        assert config.enable_x402 is False
+
+    def test_x402_public_flag_enables_x402_without_circle_credentials(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "circle",
+            "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
+            "OMNICLAW_ENABLE_X402": "true",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402_exact is True
+        assert config.enable_x402 is True
+
+    def test_x402_public_flag_enables_gateway_with_circle_api_key(self) -> None:
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "circle",
+            "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
+            "OMNICLAW_ENABLE_X402": "true",
+            "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+            "OMNICLAW_RPC_URL": "https://rpc.example",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402_exact is True
+        assert config.enable_x402 is True
+
+    def test_string_override_false_disables_public_x402(self) -> None:
+        config = Config.from_env(
+            buyer_mode="hybrid ",
+            circle_api_key="test_key",
+            entity_secret="test_secret",
+            nanopayments_private_key="0x" + "1" * 64,
+            rpc_url="https://rpc.example",
+            enable_x402="false",
+        )
+
+        assert config.buyer_mode == "hybrid"
+        assert config.enable_circle_transfer is True
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is False
+        assert config.enable_x402 is False
+
+    def test_hybrid_mode_requires_entity_secret_and_private_key(self) -> None:
+        """Hybrid buyer mode requires both Circle transfer and EOA credentials."""
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OMNICLAW_BUYER_MODE": "hybrid",
+                    "CIRCLE_API_KEY": "test_key",
+                },
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="ENTITY_SECRET"),
+        ):
+            Config.from_env()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OMNICLAW_BUYER_MODE": "hybrid",
+                    "CIRCLE_API_KEY": "test_key",
+                    "ENTITY_SECRET": "test_secret",
+                },
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="OMNICLAW_PRIVATE_KEY"),
+        ):
+            Config.from_env()
 
     def test_from_env_with_overrides(self) -> None:
         """Test from_env with override values."""

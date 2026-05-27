@@ -215,7 +215,7 @@ class WebhookParser:
             ValidationError: If payload malformed
         """
         # 1. Verify Signature (if raw payload provided)
-        if isinstance(payload, (str, bytes)):
+        if isinstance(payload, str | bytes):
             if not self.verify_signature(payload, headers):
                 raise InvalidSignatureError("Invalid webhook signature")
 
