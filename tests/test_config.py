@@ -117,7 +117,7 @@ class TestConfig:
             Config.from_env()
 
     def test_from_env_missing_entity_secret_warns(self) -> None:
-        """x402 mode with Gateway support needs Circle API, not Circle entity secret."""
+        """x402 mode does not need Circle entity secret."""
         env_vars = {
             "CIRCLE_API_KEY": "test_key",
             "OMNICLAW_BUYER_MODE": "x402",
@@ -133,7 +133,7 @@ class TestConfig:
         assert config.enable_x402 is True
 
     def test_x402_mode_does_not_require_circle_credentials(self) -> None:
-        """x402 mode can use the standard x402 path without Circle credentials."""
+        """x402 mode can use EOA-backed x402 without Circle credentials."""
         env_vars = {
             "OMNICLAW_BUYER_MODE": "x402",
             "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
@@ -145,7 +145,7 @@ class TestConfig:
         assert config.circle_api_key == ""
         assert config.entity_secret == ""
         assert config.enable_circle_transfer is False
-        assert config.enable_gateway is False
+        assert config.enable_gateway is True
         assert config.enable_x402_exact is True
 
     def test_gateway_buyer_mode_is_not_accepted(self) -> None:
@@ -177,7 +177,7 @@ class TestConfig:
         assert config.enable_x402_exact is False
         assert config.enable_x402 is False
 
-    def test_x402_public_flag_enables_standard_x402_without_circle_credentials(self) -> None:
+    def test_x402_public_flag_enables_x402_without_circle_credentials(self) -> None:
         env_vars = {
             "OMNICLAW_BUYER_MODE": "circle",
             "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",
@@ -189,11 +189,11 @@ class TestConfig:
             config = Config.from_env()
 
         assert config.enable_circle_transfer is False
-        assert config.enable_gateway is False
+        assert config.enable_gateway is True
         assert config.enable_x402_exact is True
         assert config.enable_x402 is True
 
-    def test_x402_public_flag_enables_gateway_only_with_circle_api_key(self) -> None:
+    def test_x402_public_flag_enables_gateway_with_circle_api_key(self) -> None:
         env_vars = {
             "OMNICLAW_BUYER_MODE": "circle",
             "OMNICLAW_ENABLE_CIRCLE_TRANSFER": "false",

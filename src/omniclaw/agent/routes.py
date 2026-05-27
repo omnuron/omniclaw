@@ -64,6 +64,22 @@ def _rail_for_selected_route(selected_route: object) -> str | None:
     return None
 
 
+def _public_x402_route(selected_route: object) -> str | None:
+    """Expose buyer-facing rail names; keep Gateway as an internal x402 path."""
+    if _rail_for_selected_route(selected_route) == "x402":
+        return "x402"
+    return None
+
+
+def _public_payment_method(recipient: str, method: object) -> str:
+    if recipient.startswith(("http://", "https://")):
+        return "x402"
+    value = str(method.value if hasattr(method, "value") else method or "").strip().lower()
+    if value in {"transfer", "crosschain"}:
+        return "circle_transfer"
+    return value or "circle_transfer"
+
+
 def _policy_rail_enabled(policy_mgr: PolicyManager, rail: str, wallet_id: str | None) -> bool:
     if hasattr(policy_mgr, "is_rail_enabled"):
         return bool(policy_mgr.is_rail_enabled(rail, wallet_id))
@@ -161,6 +177,11 @@ async def _choose_x402_route(
     gateway_ready: bool | None = None
     gateway_reason: str | None = None
 
+    async def onchain_gateway_balance() -> Any:
+        if hasattr(client, "get_gateway_onchain_balance_for_kind"):
+            return await client.get_gateway_onchain_balance_for_kind(selected_gateway_kind)
+        return await client.get_gateway_onchain_balance(wallet_id)
+
     if selected_gateway_kind is not None and allow_gateway:
         if client._nano_adapter is None:
             gateway_ready = False
@@ -176,7 +197,7 @@ async def _choose_x402_route(
                 else:
                     # Fallback to direct on-chain balance when API-reported balance is stale/lagging.
                     try:
-                        onchain_balance = await client.get_gateway_onchain_balance(wallet_id)
+                        onchain_balance = await onchain_gateway_balance()
                         if onchain_balance.available >= required_atomic:
                             gateway_available_balance = onchain_balance.formatted_available
                             gateway_ready = True
@@ -188,8 +209,19 @@ async def _choose_x402_route(
                     except Exception:
                         gateway_reason = "Gateway balance is below the required amount"
             except Exception as exc:
-                gateway_ready = False
-                gateway_reason = f"Gateway balance check failed: {exc}"
+                try:
+                    required_atomic = int(selected_gateway_kind.amount_atomic)
+                    onchain_balance = await onchain_gateway_balance()
+                    gateway_available_balance = onchain_balance.formatted_available
+                    gateway_ready = onchain_balance.available >= required_atomic
+                    gateway_reason = (
+                        "Gateway on-chain balance is sufficient"
+                        if gateway_ready
+                        else "Gateway on-chain balance is below the required amount"
+                    )
+                except Exception:
+                    gateway_ready = False
+                    gateway_reason = f"Gateway balance check failed: {exc}"
 
     if selected_gateway_kind is not None and allow_gateway and gateway_ready:
         return {
@@ -449,10 +481,19 @@ async def get_balance(
         )
 
     if client._nano_adapter:
-        gateway_balance = await client.get_gateway_balance(agent.wallet_id)
-        available = gateway_balance.available_decimal
-        total = gateway_balance.total_decimal
+        note = None
+        try:
+            gateway_balance = await client.get_gateway_balance(agent.wallet_id)
+        except Exception as exc:
+            gateway_balance = None
+            note = (
+                "Gateway API balance unavailable. x402 Gateway payments use seller-specific "
+                f"on-chain balance checks when needed: {exc}"
+            )
+        available = gateway_balance.available_decimal if gateway_balance else "0.00"
+        total = gateway_balance.total_decimal if gateway_balance else None
         reserved = None
+        source = "gateway_api" if gateway_balance else "unavailable"
     else:
         balance = await wallet_mgr.get_wallet_balance(agent.wallet_id)
         if balance is None:
@@ -460,12 +501,16 @@ async def get_balance(
         available = str(balance)
         total = None
         reserved = None
+        source = "circle_wallet"
+        note = None
 
     return BalanceResponse(
         wallet_id=agent.wallet_id,
         available=_fmt_amount(available),
         total=_fmt_amount(total) if total is not None else None,
         reserved=reserved,
+        source=source,
+        note=note,
     )
 
 
@@ -485,12 +530,27 @@ async def get_detailed_balance(
     eoa_address = _client_signer_address(client)
     circle_address = await wallet_mgr.get_wallet_address(agent.wallet_id)
     circle_balance = await wallet_mgr.get_wallet_balance(agent.wallet_id)
-    gateway_balance = (
-        await client.get_gateway_balance(agent.wallet_id) if client._nano_adapter else None
-    )
-    gateway_onchain_balance = (
-        await client.get_gateway_onchain_balance(agent.wallet_id) if client._nano_adapter else None
-    )
+    gateway_balance = None
+    gateway_onchain_balance = None
+    gateway_balance_note = None
+    gateway_onchain_balance_note = None
+    if client._nano_adapter:
+        try:
+            gateway_balance = await client.get_gateway_balance(agent.wallet_id)
+        except Exception as exc:
+            gateway_balance = None
+            gateway_balance_note = (
+                "Gateway API balance unavailable. x402 Gateway payments can still use "
+                f"seller-specific on-chain checks: {exc}"
+            )
+        try:
+            gateway_onchain_balance = await client.get_gateway_onchain_balance(agent.wallet_id)
+        except Exception as exc:
+            gateway_onchain_balance = None
+            gateway_onchain_balance_note = (
+                "Generic Gateway on-chain balance unavailable without configured Gateway "
+                f"metadata: {exc}"
+            )
     payment_address = (
         await client.get_payment_address(agent.wallet_id) if client._nano_client else None
     )
@@ -509,12 +569,16 @@ async def get_detailed_balance(
         else "0.00",
         "gateway_balance_atomic": gateway_balance.available if gateway_balance else 0,
         "gateway_total_atomic": gateway_balance.total if gateway_balance else 0,
+        "gateway_balance_available": gateway_balance is not None,
+        "gateway_balance_note": gateway_balance_note,
         "gateway_onchain_balance": _fmt_amount(gateway_onchain_balance.available_decimal)
         if gateway_onchain_balance
         else "0.00",
         "gateway_onchain_balance_atomic": gateway_onchain_balance.available
         if gateway_onchain_balance
         else 0,
+        "gateway_onchain_balance_available": gateway_onchain_balance is not None,
+        "gateway_onchain_balance_note": gateway_onchain_balance_note,
         "circle_wallet_address": circle_address,
         "circle_wallet_balance": _fmt_amount(circle_balance)
         if circle_balance is not None
@@ -1062,9 +1126,7 @@ async def pay(
             status=result.status.value
             if result.status and hasattr(result.status, "value")
             else (str(result.status) if result.status else "failed"),
-            method=result.method.value
-            if result.method and hasattr(result.method, "value")
-            else (str(result.method) if result.method else "transfer"),
+            method=_public_payment_method(result.recipient, result.method),
             error=result.error,
             requires_confirmation=requires_confirmation,
             confirmation_id=confirmation_id,
@@ -1162,7 +1224,7 @@ async def simulate(
             allowed, reason = policy_mgr.check_limits(Decimal(amount_raw), agent.wallet_id)
             if not allowed:
                 return SimulateResponse(would_succeed=False, route="x402", reason=reason)
-            route_name = "NANOPAYMENT" if selected_route == "nanopayment" else "x402"
+            route_name = "x402"
             if selected_route == "nanopayment":
                 return SimulateResponse(
                     would_succeed=bool(x402_details.get("gateway_ready")),
@@ -1407,9 +1469,7 @@ async def confirm_intent(
             status=result.status.value
             if result.status and hasattr(result.status, "value")
             else (str(result.status) if result.status else "failed"),
-            method=result.method.value
-            if result.method and hasattr(result.method, "value")
-            else (str(result.method) if result.method else "transfer"),
+            method=_public_payment_method(result.recipient, result.method),
             error=result.error,
         )
     except HTTPException:
@@ -1699,8 +1759,8 @@ async def x402_inspect(
         requires_payment=True,
         buyer_ready=buyer_ready,
         reason=reason,
-        router_detected_route=inspection.get("router_detected_route"),
-        selected_route=selected_route,
+        router_detected_route=_public_x402_route(inspection.get("router_detected_route")),
+        selected_route=_public_x402_route(selected_route),
         payment_source=payment_source,
         buyer_address=buyer_address,
         gateway_available_balance=gateway_available_balance,

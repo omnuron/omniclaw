@@ -49,6 +49,8 @@ class BalanceResponse(BaseModel):
     available: str
     reserved: str | None = None
     total: str | None = None
+    source: str | None = None
+    note: str | None = None
 
 
 class SimulateRequest(BaseModel):

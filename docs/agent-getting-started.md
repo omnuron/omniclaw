@@ -30,10 +30,11 @@ Mode requirements:
 | --- | --- |
 | `hybrid` | `CIRCLE_API_KEY`, `ENTITY_SECRET`, `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL` |
 | `circle` | `CIRCLE_API_KEY`, `ENTITY_SECRET` |
-| `x402` | `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL`; add `CIRCLE_API_KEY` and Gateway balance for `GatewayWalletBatched` nanopayments |
+| `x402` | `OMNICLAW_PRIVATE_KEY`, `OMNICLAW_RPC_URL`, and funded Gateway balance for `GatewayWalletBatched` nanopayments |
 
-For x402 nanopayments, also set `CIRCLE_API_KEY` and fund the Gateway balance. Gateway
-is an x402 execution path, not a separate buyer rail.
+`CIRCLE_API_KEY` is not required for x402 Gateway nanopayments. It is only needed
+for Circle direct transfers and optional Circle Gateway API helper operations.
+Gateway is an x402 execution path, not a separate buyer rail.
 
 ## Configure The Buyer CLI
 
@@ -46,14 +47,14 @@ export OMNICLAW_TOKEN="$OMNICLAW_AGENT_TOKEN"
 ## Inspect A Paid URL
 
 ```bash
-omniclaw-cli can-pay --recipient https://paid.example.com/compute
-omniclaw-cli inspect-x402 --recipient https://paid.example.com/compute
+omniclaw-cli can-pay --recipient "http://127.0.0.1:4023/compute?size=20"
+omniclaw-cli inspect-x402 --recipient "http://127.0.0.1:4023/compute?size=20"
 ```
 
 ## Pay A Paid API
 
 ```bash
-omniclaw-cli pay --recipient https://paid.example.com/compute --amount 0.10 --idempotency-key job-123
+omniclaw-cli pay --recipient "http://127.0.0.1:4023/compute?size=20" --amount 0.10 --idempotency-key job-123
 ```
 
 ## Direct Transfer

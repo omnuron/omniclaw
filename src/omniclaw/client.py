@@ -68,6 +68,7 @@ from omniclaw.payment.router import PaymentRouter
 from omniclaw.protocols.gateway import GatewayAdapter
 from omniclaw.protocols.nanopayments import (
     DepositResult,
+    GatewayAPIError,
     GatewayBalance,
     NanopaymentAdapter,
     NanopaymentClient,
@@ -167,7 +168,8 @@ class OmniClaw:
 
         if not circle_api_key:
             self._logger.warning(
-                "CIRCLE_API_KEY not set. Circle transfer and Gateway rails will be unavailable."
+                "CIRCLE_API_KEY not set. Circle direct transfers and Circle Gateway API helper "
+                "calls will be unavailable; x402 signing can still use OMNICLAW_PRIVATE_KEY."
             )
 
         self._config = Config.from_env(
@@ -213,7 +215,7 @@ class OmniClaw:
             self._router.register_adapter(TransferAdapter(self._config, self._wallet_service))
         if self._config.enable_x402_exact:
             self._router.register_adapter(X402Adapter(self._config, self._wallet_service))
-        if self._config.enable_gateway:
+        if self._config.enable_circle_transfer:
             self._router.register_adapter(GatewayAdapter(self._config, self._wallet_service))
 
         # Register NanopaymentProtocolAdapter if nanopayments initialized successfully
@@ -406,7 +408,7 @@ class OmniClaw:
             )
             self._nano_client = NanopaymentClient(
                 environment=self._config.nanopayments_environment,
-                api_key=self._config.circle_api_key,
+                api_key=self._config.circle_api_key or None,
             )
 
             if not self._config.nanopayments_private_key:
@@ -426,6 +428,7 @@ class OmniClaw:
                 auto_topup_threshold=self._config.nanopayments_topup_threshold,
                 auto_topup_amount=self._config.nanopayments_topup_amount,
                 strict_settlement=self._config.payment_strict_settlement,
+                rpc_url=self._config.rpc_url,
             )
             self._logger.info(f"Nanopayments initialized (direct private key, network={network})")
         except Exception as e:
@@ -608,6 +611,16 @@ class OmniClaw:
         """Get the spendable Gateway balance for the current signer."""
         if not self._nano_adapter or not self._nano_client:
             raise NanopaymentNotInitializedError()
+        if not self._nano_client.has_api_key:
+            raise GatewayAPIError(
+                message=(
+                    "Gateway API balance check requires CIRCLE_API_KEY. During x402 seller "
+                    "routing OmniClaw checks Gateway balance on-chain from the seller's "
+                    "GatewayWalletBatched metadata."
+                ),
+                status_code=0,
+                response_body=None,
+            )
 
         network = self._nanopayment_network()
         balance = await self._nano_client.check_balance(
@@ -620,6 +633,15 @@ class OmniClaw:
             formatted_total=f"{balance.total / 1e6} USDC",
             formatted_available=f"{balance.available / 1e6} USDC",
         )
+
+    async def get_gateway_onchain_balance_for_kind(
+        self,
+        gateway_kind: Any,
+    ) -> GatewayBalance:
+        """Get on-chain Gateway balance using seller-provided Gateway x402 metadata."""
+        if not self._nano_adapter:
+            raise NanopaymentNotInitializedError()
+        return await self._nano_adapter.get_onchain_available_balance(gateway_kind)
 
     async def get_gateway_onchain_balance(
         self,
@@ -1250,16 +1272,19 @@ class OmniClaw:
                 self._route_uses_gateway_balance(detected_route, preferred_url_route)
                 and self._nano_adapter
             ):
-                try:
-                    gateway_balance = await self.get_gateway_balance(wallet_id)
-                    available = Decimal(str(gateway_balance.available_decimal))
-                    balance_source = f"Gateway available: {available}"
-                except Exception as e:
-                    # For nanopayment routes, don't fall back to circle balance
-                    # Instead, log error and use 0 (will fail with clearer message)
-                    self._logger.warning(f"Gateway balance check failed: {e}")
-                    available = Decimal("0")
-                    balance_source = "Gateway available: (check failed)"
+                if str(recipient).startswith(("http://", "https://")):
+                    available = amount_decimal
+                    balance_source = "x402 Gateway: deferred to x402 adapter"
+                else:
+                    try:
+                        gateway_balance = await self.get_gateway_balance(wallet_id)
+                        available = Decimal(str(gateway_balance.available_decimal))
+                        balance_source = f"Gateway available: {available}"
+                    except Exception as e:
+                        # For direct nanopayment routes, don't fall back to circle balance.
+                        self._logger.warning(f"Gateway balance check failed: {e}")
+                        available = Decimal("0")
+                        balance_source = "Gateway available: (check failed)"
             elif self._route_value(detected_route) == PaymentMethod.X402.value:
                 available = amount_decimal
                 balance_source = "Direct x402: deferred to x402 adapter"
@@ -1667,25 +1692,29 @@ class OmniClaw:
             self._route_uses_gateway_balance(detected_route, preferred_url_route)
             and self._nano_adapter
         ):
-            try:
-                # Direct private key mode - use ON-CHAIN query
-                from omniclaw.protocols.nanopayments.wallet import GatewayWalletManager
+            if str(recipient).startswith(("http://", "https://")):
+                available = amount_decimal
+                balance_source = "x402 Gateway: deferred to x402 adapter"
+            else:
+                try:
+                    # Direct private key mode - use ON-CHAIN query
+                    from omniclaw.protocols.nanopayments.wallet import GatewayWalletManager
 
-                private_key = self._nano_adapter.signer.raw_key
-                network = self._nanopayment_network()
-                manager = GatewayWalletManager(
-                    private_key=private_key,
-                    network=network,
-                    rpc_url=self._config.rpc_url or "",
-                    nanopayment_client=self._nano_client,
-                )
-                # Use on-chain available balance
-                available = await manager.get_gateway_available_balance()
-                balance_source = f"Gateway: {available}"
-            except Exception as e:
-                self._logger.warning(f"Gateway balance check failed: {e}")
-                available = 0
-                balance_source = "Gateway: (check failed)"
+                    private_key = self._nano_adapter.signer.raw_key
+                    network = self._nanopayment_network()
+                    manager = GatewayWalletManager(
+                        private_key=private_key,
+                        network=network,
+                        rpc_url=self._config.rpc_url or "",
+                        nanopayment_client=self._nano_client,
+                    )
+                    # Use on-chain available balance
+                    available = await manager.get_gateway_available_balance()
+                    balance_source = f"Gateway: {available}"
+                except Exception as e:
+                    self._logger.warning(f"Gateway balance check failed: {e}")
+                    available = 0
+                    balance_source = "Gateway: (check failed)"
         elif self._route_value(detected_route) == PaymentMethod.X402.value:
             available = amount_decimal
             balance_source = "Direct x402: deferred to x402 adapter"

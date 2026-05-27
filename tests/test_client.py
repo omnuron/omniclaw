@@ -483,9 +483,7 @@ class TestUrlRouteBalanceChecks:
         client._router.pay.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_pay_nanopayment_route_uses_gateway_balance(self, client):
-        from omniclaw.protocols.nanopayments import GatewayBalance
-
+    async def test_pay_url_nanopayment_route_delegates_gateway_balance_to_adapter(self, client):
         client._nano_adapter = object()
         client._wallet_service.get_wallet = lambda _wid: SimpleNamespace(blockchain="ARC-TESTNET")
         client._wallet_service.get_usdc_balance_amount = MagicMock(
@@ -493,14 +491,7 @@ class TestUrlRouteBalanceChecks:
         )
         client._router.detect_method = MagicMock(return_value=PaymentMethod.NANOPAYMENT)
         client._router._find_adapter = MagicMock(side_effect=AssertionError("direct x402 not used"))
-        client.get_gateway_balance = AsyncMock(
-            return_value=GatewayBalance(
-                total=2000,
-                available=2000,
-                formatted_total="0.002 USDC",
-                formatted_available="0.002 USDC",
-            )
-        )
+        client.get_gateway_balance = AsyncMock(side_effect=AssertionError("gateway not used"))
         client._router.pay = AsyncMock(
             return_value=PaymentResult(
                 success=True,
@@ -522,7 +513,7 @@ class TestUrlRouteBalanceChecks:
         )
 
         assert result.success is True
-        client.get_gateway_balance.assert_awaited_once_with("wallet-123")
+        client.get_gateway_balance.assert_not_awaited()
         client._wallet_service.get_usdc_balance_amount.assert_not_called()
         client._router._find_adapter.assert_not_called()
         client._router.pay.assert_awaited_once()

@@ -528,6 +528,46 @@ async def test_choose_x402_route_uses_onchain_fallback_when_api_balance_is_stale
 
 
 @pytest.mark.asyncio
+async def test_choose_x402_route_uses_onchain_balance_when_gateway_api_unavailable():
+    gateway_kind = SimpleNamespace(
+        amount_atomic=250000,
+        is_gateway_batched=True,
+        get_amount_usdc=lambda: Decimal("0.25"),
+    )
+    requirements = SimpleNamespace(
+        select_preferred_kind=lambda *, prefer_gateway, source_network: (
+            gateway_kind if prefer_gateway else None
+        )
+    )
+    client = SimpleNamespace(
+        _nano_adapter=object(),
+        get_gateway_balance=AsyncMock(side_effect=RuntimeError("CIRCLE_API_KEY missing")),
+        get_gateway_onchain_balance_for_kind=AsyncMock(
+            return_value=SimpleNamespace(
+                available=300000,
+                formatted_available="0.30",
+            )
+        ),
+    )
+    x402_adapter = SimpleNamespace(
+        _resolve_agent_network=lambda wallet_id, destination_chain: "eip155:84532"
+    )
+
+    route = await _choose_x402_route(
+        client=client,
+        wallet_id="buyer-wallet",
+        x402_adapter=x402_adapter,
+        requirements=requirements,
+    )
+
+    assert route["selected_route"] == "nanopayment"
+    assert route["gateway_ready"] is True
+    assert route["gateway_available_balance"] == "0.30"
+    assert route["gateway_reason"] == "Gateway on-chain balance is sufficient"
+    client.get_gateway_onchain_balance_for_kind.assert_awaited_once_with(gateway_kind)
+
+
+@pytest.mark.asyncio
 async def test_pay_route_inspects_url_even_when_amount_is_supplied(
     monkeypatch: pytest.MonkeyPatch,
 ):
