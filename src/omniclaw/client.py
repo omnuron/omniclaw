@@ -1941,9 +1941,7 @@ class OmniClaw:
                 intent_id=intent.id,
                 correlation_id=(intent.metadata or {}).get("idempotency_key"),
                 payload={
-                    "authorization_digest": (intent.metadata or {}).get(
-                        "authorization_digest"
-                    )
+                    "authorization_digest": (intent.metadata or {}).get("authorization_digest")
                 },
             )
 
