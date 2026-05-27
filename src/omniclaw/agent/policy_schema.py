@@ -39,6 +39,14 @@ class RecipientConfigModel(BaseModel):
     domains: list[str] = Field(default_factory=list)
 
 
+class RailsModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    circle_transfer: bool = True
+    x402_exact: bool = True
+    gateway: bool = True
+
+
 class TokenConfigModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +65,7 @@ class WalletConfigModel(BaseModel):
     rate_limits: RateLimitsModel | None = None
     recipients: RecipientConfigModel | None = None
     confirm_threshold: Decimal | None = None
+    rails: RailsModel | None = None
 
     @field_validator("address")
     @classmethod

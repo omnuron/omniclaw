@@ -83,7 +83,7 @@ async def create_agent_wallet(
         )
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("create_agent_wallet", exc)
+        raise _fail("create_agent_wallet", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ async def list_wallets(
         result = await client.list_wallets(wallet_set_id=wallet_set_id)
         return {"status": "success", "wallets": result}
     except Exception as exc:
-        raise _fail("list_wallets", exc)
+        raise _fail("list_wallets", exc) from exc
 
 
 @mcp.tool()
@@ -117,7 +117,7 @@ async def get_wallet(
         result = await client.get_wallet(wallet_id)
         return {"status": "success", "wallet": result}
     except Exception as exc:
-        raise _fail("get_wallet", exc)
+        raise _fail("get_wallet", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ async def check_balance(
         result = await client.get_wallet_usdc_balance(wallet_id)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("check_balance", exc)
+        raise _fail("check_balance", exc) from exc
 
 
 @mcp.tool()
@@ -148,7 +148,7 @@ async def get_balances(
         result = await client.get_balances(wallet_id)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("get_balances", exc)
+        raise _fail("get_balances", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ async def simulate(
         )
         return {"status": "success", "simulation": result}
     except Exception as exc:
-        raise _fail("simulate", exc)
+        raise _fail("simulate", exc) from exc
 
 
 @mcp.tool()
@@ -254,7 +254,7 @@ async def pay(
         )
         return {"status": "success", "payment": result}
     except Exception as exc:
-        raise _fail("pay", exc)
+        raise _fail("pay", exc) from exc
 
 
 @mcp.tool()
@@ -274,7 +274,7 @@ async def batch_pay(
         )
         return {"status": "success", "batch_result": result}
     except Exception as exc:
-        raise _fail("batch_pay", exc)
+        raise _fail("batch_pay", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -319,7 +319,7 @@ async def create_payment_intent(
         )
         return {"status": "success", "intent": result}
     except Exception as exc:
-        raise _fail("create_payment_intent", exc)
+        raise _fail("create_payment_intent", exc) from exc
 
 
 @mcp.tool()
@@ -332,7 +332,7 @@ async def get_payment_intent(
         result = await client.get_payment_intent(intent_id)
         return {"status": "success", "intent": result}
     except Exception as exc:
-        raise _fail("get_payment_intent", exc)
+        raise _fail("get_payment_intent", exc) from exc
 
 
 @mcp.tool()
@@ -345,7 +345,7 @@ async def confirm_payment_intent(
         result = await client.confirm_intent(intent_id)
         return {"status": "success", "payment": result}
     except Exception as exc:
-        raise _fail("confirm_payment_intent", exc)
+        raise _fail("confirm_payment_intent", exc) from exc
 
 
 @mcp.tool()
@@ -359,7 +359,7 @@ async def cancel_intent(
         result = await client.cancel_intent(intent_id, reason=reason)
         return {"status": "success", "intent": result}
     except Exception as exc:
-        raise _fail("cancel_intent", exc)
+        raise _fail("cancel_intent", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -382,7 +382,7 @@ async def list_transactions(
         result = await client.list_transactions(wallet_id=wallet_id, blockchain=blockchain)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("list_transactions", exc)
+        raise _fail("list_transactions", exc) from exc
 
 
 @mcp.tool()
@@ -395,7 +395,7 @@ async def sync_transaction(
         result = await client.sync_transaction(ledger_entry_id)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("sync_transaction", exc)
+        raise _fail("sync_transaction", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -413,7 +413,7 @@ async def can_pay(
         result = await client.can_pay(recipient)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("can_pay", exc)
+        raise _fail("can_pay", exc) from exc
 
 
 @mcp.tool()
@@ -426,7 +426,7 @@ async def detect_payment_method(
         result = await client.detect_method(recipient)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("detect_payment_method", exc)
+        raise _fail("detect_payment_method", exc) from exc
 
 
 @mcp.tool()
@@ -451,7 +451,7 @@ async def trust_lookup(
         )
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("trust_lookup", exc)
+        raise _fail("trust_lookup", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -469,4 +469,4 @@ async def ledger_get_entry(
         result = await client.ledger_get_entry(entry_id)
         return {"status": "success", **result}
     except Exception as exc:
-        raise _fail("ledger_get_entry", exc)
+        raise _fail("ledger_get_entry", exc) from exc

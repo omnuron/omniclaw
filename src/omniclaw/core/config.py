@@ -25,7 +25,7 @@ def _get_env_var(name: str, default: str | None = None, required: bool = False) 
 class Config:
     """SDK configuration."""
 
-    circle_api_key: str
+    circle_api_key: str = ""
     entity_secret: str = ""
     network: Network = Network.ETH
     storage_backend: str = "memory"
@@ -39,6 +39,10 @@ class Config:
     max_api_calls_per_second: int = 30  # Conservative limit (Circle allows 35) endpoints
     circle_api_base_url: str = "https://api.circle.com/v1/w3s"
     rpc_url: str | None = None
+    buyer_mode: str = "circle"
+    enable_circle_transfer: bool = True
+    enable_gateway: bool = False
+    enable_x402_exact: bool = False
 
     # x402 facilitator (thirdweb)
     x402_facilitator_url: str = "https://x402.org/facilitator"
@@ -70,7 +74,7 @@ class Config:
     # =====================================================================
     # Nanopayments (EIP-3009 Circle Gateway batched settlement)
     # =====================================================================
-    nanopayments_enabled: bool = True
+    nanopayments_enabled: bool = False
     """Enable nanopayments (EIP-3009 batched USDC micro-payments)."""
 
     nanopayments_environment: str = "testnet"
@@ -98,8 +102,19 @@ class Config:
     """If true, opportunistically reconcile pending settlements during payment operations."""
 
     def __post_init__(self) -> None:
-        if not self.circle_api_key:
-            raise ValueError("circle_api_key is required")
+        mode = self.buyer_mode.strip().lower()
+        if mode not in {"hybrid", "circle", "gateway", "x402"}:
+            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, gateway, x402")
+        if (self.enable_circle_transfer or self.enable_gateway) and not self.circle_api_key:
+            raise ValueError(
+                "CIRCLE_API_KEY is required when Circle transfers or Gateway payments are enabled"
+            )
+        if self.enable_circle_transfer and not self.entity_secret:
+            raise ValueError("ENTITY_SECRET is required when Circle transfer rail is enabled")
+        if (self.enable_gateway or self.enable_x402_exact) and not self.nanopayments_private_key:
+            raise ValueError(
+                "OMNICLAW_PRIVATE_KEY is required when Gateway or x402 exact payments are enabled"
+            )
         if not self.entity_secret and not self.nanopayments_private_key:
             import logging
 
@@ -117,9 +132,7 @@ class Config:
                 return overrides[name]
             return _get_env_var(env_name, default=default)
 
-        circle_api_key = override_or_env("circle_api_key", "CIRCLE_API_KEY") or _get_env_var(
-            "CIRCLE_API_KEY", required=True
-        )
+        circle_api_key = override_or_env("circle_api_key", "CIRCLE_API_KEY", default="") or ""
         entity_secret = override_or_env("entity_secret", "ENTITY_SECRET", default="")
 
         # Direct private key for nanopayments
@@ -137,6 +150,47 @@ class Config:
 
         env = override_or_env("env", "OMNICLAW_ENV", "development")
         rpc_url = override_or_env("rpc_url", "OMNICLAW_RPC_URL")
+        buyer_mode = str(override_or_env("buyer_mode", "OMNICLAW_BUYER_MODE", "circle")).lower()
+
+        mode_defaults = {
+            "hybrid": {
+                "enable_circle_transfer": True,
+                "enable_gateway": True,
+                "enable_x402_exact": True,
+            },
+            "circle": {
+                "enable_circle_transfer": True,
+                "enable_gateway": False,
+                "enable_x402_exact": False,
+            },
+            "gateway": {
+                "enable_circle_transfer": False,
+                "enable_gateway": True,
+                "enable_x402_exact": True,
+            },
+            "x402": {
+                "enable_circle_transfer": False,
+                "enable_gateway": False,
+                "enable_x402_exact": True,
+            },
+        }
+        defaults = mode_defaults.get(buyer_mode)
+        if defaults is None:
+            raise ValueError("OMNICLAW_BUYER_MODE must be one of: hybrid, circle, gateway, x402")
+
+        def rail_flag(name: str, env_name: str) -> bool:
+            if name in overrides:
+                return bool(overrides[name])
+            env_value = _get_env_var(env_name)
+            if env_value is None:
+                return bool(defaults[name])
+            return str(env_value).strip().lower() in {"1", "true", "yes", "on"}
+
+        enable_circle_transfer = rail_flag(
+            "enable_circle_transfer", "OMNICLAW_ENABLE_CIRCLE_TRANSFER"
+        )
+        enable_gateway = rail_flag("enable_gateway", "OMNICLAW_ENABLE_GATEWAY")
+        enable_x402_exact = rail_flag("enable_x402_exact", "OMNICLAW_ENABLE_X402_EXACT")
 
         storage_backend = override_or_env("storage_backend", "OMNICLAW_STORAGE_BACKEND", "memory")
         redis_url = override_or_env("redis_url", "OMNICLAW_REDIS_URL")
@@ -171,8 +225,8 @@ class Config:
         )
         confirm_threshold = override_or_env("confirm_threshold", "OMNICLAW_CONFIRM_THRESHOLD")
 
-        # Nanopayments configuration (always enabled, env auto-detected from OMNICLAW_ENV)
-        nanopayments_enabled = True
+        # Nanopayments/Gateway configuration
+        nanopayments_enabled = enable_gateway
         nanopayments_auto_topup = (
             overrides.get("nanopayments_auto_topup")
             if "nanopayments_auto_topup" in overrides
@@ -219,6 +273,10 @@ class Config:
             log_level=log_level,  # type: ignore
             env=env,  # type: ignore
             rpc_url=rpc_url,
+            buyer_mode=buyer_mode,
+            enable_circle_transfer=enable_circle_transfer,
+            enable_gateway=enable_gateway,
+            enable_x402_exact=enable_x402_exact,
             daily_budget=daily_budget,
             hourly_budget=hourly_budget,
             tx_limit=tx_limit,
@@ -255,6 +313,10 @@ class Config:
             "log_level": self.log_level,
             "env": self.env,
             "rpc_url": self.rpc_url,
+            "buyer_mode": self.buyer_mode,
+            "enable_circle_transfer": self.enable_circle_transfer,
+            "enable_gateway": self.enable_gateway,
+            "enable_x402_exact": self.enable_x402_exact,
             "daily_budget": self.daily_budget,
             "hourly_budget": self.hourly_budget,
             "tx_limit": self.tx_limit,

@@ -14,7 +14,7 @@ def _normalize_part(value: Any) -> str:
     """Normalize a value into a deterministic string for hashing."""
     if value is None:
         return ""
-    if isinstance(value, (dict, list, tuple)):
+    if isinstance(value, dict | list | tuple):
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     if isinstance(value, Decimal):
         return _normalize_decimal(value)

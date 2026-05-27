@@ -1,15 +1,15 @@
 {
   "version": "2.0",
   "tokens": {
-    "test-agent-token": {
-      "wallet_alias": "default",
+    "replace-with-agent-token": {
+      "wallet_alias": "payment-agent",
       "active": true,
-      "label": "Test Agent"
+      "label": "Payment Agent"
     }
   },
   "wallets": {
-    "default": {
-      "name": "Test Wallet",
+    "payment-agent": {
+      "name": "Payment Agent",
       "limits": {
         "daily_max": "100.00",
         "per_tx_max": "10.00"

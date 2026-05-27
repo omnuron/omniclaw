@@ -7,13 +7,13 @@ and query wallet, intent, ledger, and confirmation state.
 Start the policy engine with Docker Compose:
 
 ```bash
-docker compose up --build omniclaw-agent
+docker compose -f examples/agent/buyer/docker-compose.yml --env-file .env up --build
 ```
 
 Then configure the CLI:
 
 ```bash
-omniclaw configure --server-url http://localhost:8080 --token agent-token
+omniclaw configure --server-url http://127.0.0.1:9091 --token agent-token
 ```
 
 ## Buyer CLI
@@ -23,5 +23,5 @@ omniclaw configure --server-url http://localhost:8080 --token agent-token
 ```bash
 omniclaw-cli can-pay --recipient https://paid.example.com/compute
 omniclaw-cli inspect-x402 --recipient https://paid.example.com/compute
-omniclaw-cli pay --recipient https://paid.example.com/compute --idempotency-key job-123
+omniclaw-cli pay --recipient https://paid.example.com/compute --amount 0.10 --idempotency-key job-123
 ```

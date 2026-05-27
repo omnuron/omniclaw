@@ -254,7 +254,10 @@ async def test_pay_route_uses_seller_declared_amount_for_url_payments(
         resource_data={"ok": True},
         metadata={},
     )
-    client = SimpleNamespace(pay=AsyncMock(return_value=payment_result))
+    client = SimpleNamespace(
+        config=SimpleNamespace(enable_gateway=False, enable_x402_exact=True),
+        pay=AsyncMock(return_value=payment_result),
+    )
     selected_kind = SimpleNamespace(get_amount_usdc=lambda: Decimal("0.25"))
 
     async def fake_inspect_x402_target(**kwargs):
@@ -329,7 +332,10 @@ async def test_pay_route_uses_zero_amount_for_free_url(monkeypatch: pytest.Monke
         resource_data={"ok": True},
         metadata={"http_status": 200},
     )
-    client = SimpleNamespace(pay=AsyncMock(return_value=payment_result))
+    client = SimpleNamespace(
+        config=SimpleNamespace(enable_gateway=False, enable_x402_exact=True),
+        pay=AsyncMock(return_value=payment_result),
+    )
 
     async def fake_inspect_x402_target(**kwargs):
         return {
@@ -515,7 +521,10 @@ async def test_choose_x402_route_uses_onchain_fallback_when_api_balance_is_stale
     assert route["selected_kind"] is gateway_kind
     assert route["gateway_ready"] is True
     assert route["gateway_available_balance"] == "0.30"
-    assert route["gateway_reason"] == "Gateway on-chain balance is sufficient (API balance appears stale)"
+    assert (
+        route["gateway_reason"]
+        == "Gateway on-chain balance is sufficient (API balance appears stale)"
+    )
 
 
 @pytest.mark.asyncio
@@ -533,7 +542,10 @@ async def test_pay_route_inspects_url_even_when_amount_is_supplied(
         resource_data={"ok": True},
         metadata={},
     )
-    client = SimpleNamespace(pay=AsyncMock(return_value=payment_result))
+    client = SimpleNamespace(
+        config=SimpleNamespace(enable_gateway=False, enable_x402_exact=True),
+        pay=AsyncMock(return_value=payment_result),
+    )
     selected_kind = SimpleNamespace(get_amount_usdc=lambda: Decimal("0.25"))
 
     async def fake_inspect_x402_target(**kwargs):

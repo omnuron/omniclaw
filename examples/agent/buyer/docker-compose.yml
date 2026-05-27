@@ -15,17 +15,22 @@ services:
       context: ../../..
       dockerfile: Dockerfile.agent
     command: uv run uvicorn omniclaw.agent.server:app --host 0.0.0.0 --port 9091
-    env_file: ../../../.env
     environment:
+      - OMNICLAW_STORAGE_BACKEND=redis
       - OMNICLAW_REDIS_URL=redis://redis:6379/1
       - OMNICLAW_AGENT_POLICY_PATH=/config/policy.json
+      - OMNICLAW_AGENT_STATE_PATH=/config/wallet-state.json
       - OMNICLAW_LOG_LEVEL=INFO
-      - OMNICLAW_AGENT_TOKEN=payment-agent-token
-      - CIRCLE_API_KEY=${BUYER_CIRCLE_API_KEY}
-      - OMNICLAW_PRIVATE_KEY=${BUYER_OMNICLAW_PRIVATE_KEY}
-      - ENTITY_SECRET=${BUYER_ENTITY_SECRET}
+      - OMNICLAW_BUYER_MODE=${OMNICLAW_BUYER_MODE:-hybrid}
+      - OMNICLAW_NETWORK=${OMNICLAW_NETWORK:-BASE-SEPOLIA}
+      - OMNICLAW_RPC_URL=${OMNICLAW_RPC_URL:-}
+      - OMNICLAW_AGENT_TOKEN=${OMNICLAW_AGENT_TOKEN:-}
+      - OMNICLAW_OWNER_TOKEN=${OMNICLAW_OWNER_TOKEN:-}
+      - CIRCLE_API_KEY=${CIRCLE_API_KEY:-}
+      - OMNICLAW_PRIVATE_KEY=${OMNICLAW_PRIVATE_KEY:-}
+      - ENTITY_SECRET=${ENTITY_SECRET:-}
     volumes:
-      - ./policy.json:/config/policy.json
+      - ./runtime:/config
     ports:
       - "9091:9091"
     depends_on:

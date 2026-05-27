@@ -50,10 +50,12 @@ class TestConfig:
 
     def test_missing_api_key_raises(self) -> None:
         """Test missing API key raises ValueError."""
-        with pytest.raises(ValueError, match="circle_api_key is required"):
+        with pytest.raises(ValueError, match="CIRCLE_API_KEY"):
             Config(
                 circle_api_key="",
                 entity_secret="test_secret",
+                buyer_mode="circle",
+                enable_circle_transfer=True,
             )
 
     def test_missing_entity_secret_warns(self) -> None:
@@ -62,6 +64,11 @@ class TestConfig:
         config = Config(
             circle_api_key="test_key",
             entity_secret="",
+            buyer_mode="x402",
+            enable_circle_transfer=False,
+            enable_gateway=False,
+            enable_x402_exact=True,
+            nanopayments_private_key="0x" + "1" * 64,
         )
         assert config.entity_secret == ""
 
@@ -113,12 +120,77 @@ class TestConfig:
         """Test from_env with missing entity secret logs warning (no longer required)."""
         env_vars = {
             "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_BUYER_MODE": "gateway",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
             config = Config.from_env()
         assert config.entity_secret == ""
         assert config.circle_api_key == "test_key"
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+
+    def test_x402_mode_does_not_require_circle_credentials(self) -> None:
+        """x402 exact-only mode uses the EOA signer and no Circle wallet secret."""
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "x402",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.circle_api_key == ""
+        assert config.entity_secret == ""
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is False
+        assert config.enable_x402_exact is True
+
+    def test_gateway_mode_does_not_require_entity_secret(self) -> None:
+        """Gateway mode needs Circle API and EOA signer, not Circle entity secret."""
+        env_vars = {
+            "OMNICLAW_BUYER_MODE": "gateway",
+            "CIRCLE_API_KEY": "test_key",
+            "OMNICLAW_PRIVATE_KEY": "0x" + "1" * 64,
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+
+        assert config.entity_secret == ""
+        assert config.enable_circle_transfer is False
+        assert config.enable_gateway is True
+        assert config.enable_x402_exact is True
+
+    def test_hybrid_mode_requires_entity_secret_and_private_key(self) -> None:
+        """Hybrid buyer mode requires both Circle transfer and EOA credentials."""
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OMNICLAW_BUYER_MODE": "hybrid",
+                    "CIRCLE_API_KEY": "test_key",
+                },
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="ENTITY_SECRET"),
+        ):
+            Config.from_env()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OMNICLAW_BUYER_MODE": "hybrid",
+                    "CIRCLE_API_KEY": "test_key",
+                    "ENTITY_SECRET": "test_secret",
+                },
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="OMNICLAW_PRIVATE_KEY"),
+        ):
+            Config.from_env()
 
     def test_from_env_with_overrides(self) -> None:
         """Test from_env with override values."""

@@ -108,7 +108,7 @@ async def circle_webhook(
 
     except Exception as e:
         logger.error("webhook_processing_failed", error=str(e), event_type=event_type)
-        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        raise HTTPException(status_code=500, detail="Webhook processing failed") from e
 
 
 async def handle_payment_sent(payload: dict[str, Any]):

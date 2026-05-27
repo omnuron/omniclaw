@@ -12,12 +12,35 @@ from datetime import datetime, time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from omniclaw.agent.policy_schema import RecipientMode, validate_policy
 from omniclaw.core.logging import get_logger
 from omniclaw.core.types import normalize_network
 
 logger = get_logger(__name__)
+
+
+def _private_key_address(private_key: str | None) -> str | None:
+    if not private_key:
+        return None
+    try:
+        from eth_account import Account
+
+        key = private_key if private_key.startswith("0x") else f"0x{private_key}"
+        return Account.from_key(key).address
+    except Exception:
+        return None
+
+
+def _client_signer_address(client: Any) -> str | None:
+    if getattr(client, "_nano_adapter", None):
+        return client._nano_adapter.address
+    config = getattr(client, "config", None)
+    private_key = getattr(config, "nanopayments_private_key", None) or os.environ.get(
+        "OMNICLAW_PRIVATE_KEY"
+    )
+    return _private_key_address(private_key)
 
 
 @dataclass
@@ -277,6 +300,32 @@ class RecipientConfig:
 
 
 @dataclass
+class RailConfig:
+    """Enabled buyer payment rails for a policy wallet/profile."""
+
+    circle_transfer: bool = True
+    x402_exact: bool = True
+    gateway: bool = True
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> RailConfig:
+        if not data:
+            return cls()
+        return cls(
+            circle_transfer=bool(data.get("circle_transfer", True)),
+            x402_exact=bool(data.get("x402_exact", True)),
+            gateway=bool(data.get("gateway", True)),
+        )
+
+    def to_dict(self) -> dict[str, bool]:
+        return {
+            "circle_transfer": self.circle_transfer,
+            "x402_exact": self.x402_exact,
+            "gateway": self.gateway,
+        }
+
+
+@dataclass
 class Policy:
     """Main policy configuration for the agent economy."""
 
@@ -350,6 +399,57 @@ class Policy:
         )
 
 
+class RuntimeWalletState:
+    """Generated buyer wallet state kept separate from stable policy."""
+
+    def __init__(self, path: str | None = None, policy_path: str | None = None):
+        if path is None:
+            path = os.environ.get("OMNICLAW_AGENT_STATE_PATH")
+        if path is None and policy_path and str(policy_path).startswith("/config/"):
+            path = "/data/omniclaw/wallet-state.json"
+        if path is None and policy_path:
+            policy_file = Path(policy_path)
+            path = str(policy_file.with_name(f"{policy_file.stem}.state.json"))
+        self._path = Path(path or ".omniclaw-agent-state.json")
+        self._data: dict[str, Any] = {"version": "1.0", "wallets": {}}
+        self._loaded = False
+
+    def load(self) -> None:
+        if self._loaded:
+            return
+        if self._path.exists():
+            with open(self._path) as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                self._data = loaded
+        self._data.setdefault("version", "1.0")
+        self._data.setdefault("wallets", {})
+        self._loaded = True
+
+    def get_wallet(self, alias: str) -> dict[str, Any]:
+        self.load()
+        wallets = self._data.setdefault("wallets", {})
+        value = wallets.get(alias, {})
+        return dict(value) if isinstance(value, dict) else {}
+
+    def set_wallet(self, alias: str, updates: dict[str, Any]) -> bool:
+        self.load()
+        wallets = self._data.setdefault("wallets", {})
+        current = dict(wallets.get(alias, {}))
+        next_value = {**current, **updates}
+        if current == next_value:
+            return False
+        wallets[alias] = next_value
+        return True
+
+    def save(self) -> None:
+        self.load()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self._path, "w") as f:
+            json.dump(self._data, f, indent=2, default=str)
+            f.write("\n")
+
+
 class PolicyManager:
     """Manages policy loading, validation, and multi-agent token mapping."""
 
@@ -370,8 +470,12 @@ class PolicyManager:
             self._logger.warning(
                 f"Policy file not found: {self._policy_path}, creating default policy"
             )
-            # Use OMNICLAW_AGENT_TOKEN as default token key if provided
-            env_token = os.environ.get("OMNICLAW_AGENT_TOKEN", "default")
+            env_token = os.environ.get("OMNICLAW_AGENT_TOKEN")
+            if not env_token:
+                raise ValueError(
+                    "OMNICLAW_AGENT_TOKEN is required when creating a default policy. "
+                    "Set it or provide OMNICLAW_AGENT_POLICY_PATH."
+                )
             wallet_alias = os.environ.get("OMNICLAW_AGENT_WALLET", "primary")
             # Create default policy with default token and wallet
             self._policy = Policy(
@@ -388,31 +492,26 @@ class PolicyManager:
                         "name": "Primary Wallet",
                         "limits": {"daily_max": "100.00", "per_tx_max": "10.00"},
                         "recipients": {"mode": "allow_all"},
+                        "rails": {
+                            "circle_transfer": True,
+                            "x402_exact": True,
+                            "gateway": True,
+                        },
                     }
                 },
             )
             # Save default policy to file
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                payload = json.dumps(self._policy.to_dict(), indent=2, default=str)
-                with open(path, "w") as f:
-                    f.write(payload)
+                self._write_policy_file()
                 self._logger.info(f"Created default policy at {self._policy_path}")
             except Exception as e:
                 raise PermissionError(
                     f"Policy file is not writable: {self._policy_path}. {e}"
                 ) from e
-            try:
-                self._last_mtime = path.stat().st_mtime
-            except Exception:
-                self._last_mtime = None
             return self._policy
 
         try:
-            if not os.access(path, os.W_OK):
-                raise PermissionError(
-                    f"Policy file is read-only and must be writable: {self._policy_path}"
-                )
             with open(path) as f:
                 data = json.load(f)
             # Strict schema validation
@@ -429,17 +528,32 @@ class PolicyManager:
         """Persist current policy to disk."""
         if not self._policy:
             return
+        self._write_policy_file()
+
+    def _write_policy_file(self) -> None:
+        """Persist policy and refresh the watched mtime."""
+        if not self._policy:
+            return
         path = Path(self._policy_path)
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             payload = json.dumps(self._policy.to_dict(), indent=2, default=str)
             with open(path, "w") as f:
                 f.write(payload)
+                f.write("\n")
+            try:
+                self._last_mtime = path.stat().st_mtime
+            except Exception:
+                self._last_mtime = None
         except Exception as e:
-            self._logger.warning(f"Failed to save policy: {e}")
+            raise PermissionError(f"Policy file is not writable: {self._policy_path}. {e}") from e
 
     def get_token_map(self) -> dict[str, dict[str, Any]]:
         return self._policy.tokens if self._policy else {}
+
+    @property
+    def policy_path(self) -> str:
+        return self._policy_path
 
     def get_wallet_map(self) -> dict[str, dict[str, Any]]:
         return self._policy.wallets if self._policy else {}
@@ -472,6 +586,38 @@ class PolicyManager:
             return {}
         return self._wallet_id_to_config.get(wallet_id, {})
 
+    def _wallet_config(self, wallet_id: str | None) -> dict[str, Any]:
+        if not wallet_id:
+            return {}
+        return self._wallet_id_to_config.get(wallet_id, {})
+
+    def _recipient_config_for_wallet(self, wallet_id: str | None = None) -> RecipientConfig:
+        if wallet_id is None:
+            return self.get_policy().recipients
+        config = self._wallet_config(wallet_id)
+        if config.get("recipients") is not None:
+            return RecipientConfig.from_dict(config.get("recipients"))
+        return self.get_policy().recipients
+
+    def _limits_for_wallet(self, wallet_id: str | None = None) -> WalletLimits:
+        if wallet_id is None:
+            return self.get_policy().limits
+        config = self._wallet_config(wallet_id)
+        wallet_limits = WalletLimits.from_dict(config.get("limits"))
+        base_limits = self.get_policy().limits
+        return WalletLimits(
+            daily_max=wallet_limits.daily_max or base_limits.daily_max,
+            hourly_max=wallet_limits.hourly_max or base_limits.hourly_max,
+            per_tx_max=wallet_limits.per_tx_max or base_limits.per_tx_max,
+            per_tx_min=wallet_limits.per_tx_min or base_limits.per_tx_min,
+        )
+
+    @staticmethod
+    def _host_matches(hostname: str, allowed_domain: str) -> bool:
+        host = hostname.strip(".").lower()
+        domain = allowed_domain.strip(".").lower()
+        return host == domain or host.endswith(f".{domain}")
+
     def has_changed(self) -> bool:
         path = Path(self._policy_path)
         if not path.exists():
@@ -498,39 +644,36 @@ class PolicyManager:
 
     def is_valid_recipient(self, recipient: str, wallet_id: str | None = None) -> bool:
         """Check if recipient is allowed."""
-        if wallet_id is None:
-            recipient_cfg = self.get_policy().recipients
-        else:
-            config = self._wallet_id_to_config.get(wallet_id, {})
-            recipient_cfg = RecipientConfig.from_dict(config.get("recipients"))
+        recipient_cfg = self._recipient_config_for_wallet(wallet_id)
 
         if recipient_cfg.mode == RecipientMode.ALLOW_ALL.value:
             return True
 
         if not recipient_cfg.addresses and not recipient_cfg.domains:
-            return True
+            return recipient_cfg.mode != RecipientMode.WHITELIST.value
 
         if recipient in recipient_cfg.addresses:
-            return recipient_cfg.mode == "whitelist"
+            return recipient_cfg.mode == RecipientMode.WHITELIST.value
 
         if recipient.startswith("http"):
-            for domain in recipient_cfg.domains:
-                if domain in recipient:
-                    return recipient_cfg.mode == "whitelist"
+            hostname = urlparse(recipient).hostname or ""
+            domain_match = any(
+                self._host_matches(hostname, domain) for domain in recipient_cfg.domains
+            )
+            if domain_match:
+                return recipient_cfg.mode == RecipientMode.WHITELIST.value
 
-        return recipient_cfg.mode != "whitelist"
+        return recipient_cfg.mode != RecipientMode.WHITELIST.value
 
     def check_limits(
         self, amount: Decimal, wallet_id: str | None = None
     ) -> tuple[bool, str | None]:
-        if wallet_id is None:
-            limits = self.get_policy().limits
-        else:
-            config = self._wallet_id_to_config.get(wallet_id, {})
-            limits = WalletLimits.from_dict(config.get("limits"))
+        limits = self._limits_for_wallet(wallet_id)
 
         if limits.per_tx_max and amount > limits.per_tx_max:
             return False, f"Amount {amount} exceeds per_tx_max {limits.per_tx_max}"
+        if limits.per_tx_min and amount < limits.per_tx_min:
+            return False, f"Amount {amount} is below per_tx_min {limits.per_tx_min}"
 
         return True, None
 
@@ -539,16 +682,40 @@ class PolicyManager:
             threshold = self.get_policy().confirm_threshold or Decimal("0")
         else:
             config = self._wallet_id_to_config.get(wallet_id, {})
-            threshold = Decimal(config.get("confirm_threshold", "0"))
+            threshold = (
+                Decimal(str(config.get("confirm_threshold")))
+                if config.get("confirm_threshold") is not None
+                else self.get_policy().confirm_threshold or Decimal("0")
+            )
         return threshold > 0 and amount >= threshold
+
+    def rail_config(self, wallet_id: str | None = None) -> RailConfig:
+        config = self._wallet_config(wallet_id)
+        return RailConfig.from_dict(config.get("rails"))
+
+    def is_rail_enabled(self, rail: str, wallet_id: str | None = None) -> bool:
+        rails = self.rail_config(wallet_id)
+        if rail == "circle_transfer":
+            return rails.circle_transfer
+        if rail == "x402_exact":
+            return rails.x402_exact
+        if rail == "gateway":
+            return rails.gateway
+        return False
 
 
 class WalletManager:
     """Manages wallet creation based on policy mapping."""
 
-    def __init__(self, policy_manager: PolicyManager, omniclaw_client: Any):
+    def __init__(
+        self,
+        policy_manager: PolicyManager,
+        omniclaw_client: Any,
+        runtime_state: RuntimeWalletState | None = None,
+    ):
         self._policy = policy_manager
         self._client = omniclaw_client
+        self._state = runtime_state or RuntimeWalletState(policy_path=policy_manager.policy_path)
         self._logger = logger
 
     async def initialize_wallets(self) -> dict[str, str]:
@@ -565,6 +732,8 @@ class WalletManager:
         # Build alias -> tokens mapping
         alias_to_tokens: dict[str, list[str]] = {}
         for token, config in token_map.items():
+            if config.get("active") is False:
+                continue
             alias = config.get("wallet_alias", "primary")
             alias_to_tokens.setdefault(alias, []).append(token)
 
@@ -588,8 +757,23 @@ class WalletManager:
                 wallet_cfg = {}
                 self._policy.update_wallet_config(alias, wallet_cfg)
 
-            wallet_id = wallet_cfg.get("wallet_id")
-            wallet_address = wallet_cfg.get("address")
+            runtime_cfg = self._state.get_wallet(alias)
+            wallet_id = wallet_cfg.get("wallet_id") or runtime_cfg.get("circle_wallet_id")
+            wallet_address = wallet_cfg.get("address") or runtime_cfg.get("circle_wallet_address")
+            gateway_address = runtime_cfg.get("gateway_eoa_address")
+            signer_address = _client_signer_address(self._client)
+            if signer_address:
+                gateway_address = signer_address
+
+            circle_enabled = bool(getattr(self._client.config, "enable_circle_transfer", True))
+            if not circle_enabled:
+                synthetic_prefix = (
+                    "gateway" if getattr(self._client.config, "enable_gateway", False) else "eoa"
+                )
+                synthetic_id = (
+                    wallet_id or runtime_cfg.get("wallet_id") or f"{synthetic_prefix}:{alias}"
+                )
+                return alias, synthetic_id, wallet_address or gateway_address
 
             # If wallet_id exists, verify and fill address if missing
             if wallet_id:
@@ -611,16 +795,18 @@ class WalletManager:
                         if wallet and wallet.address and wallet.address != wallet_address:
                             wallet_address = wallet.address
                         return alias, wallet_id, wallet_address
-                except Exception:
-                    # Fall through to create a new wallet
-                    pass
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Configured wallet '{wallet_id}' for alias '{alias}' could not be "
+                        f"verified. Fix the policy or remove wallet_id to create a new wallet."
+                    ) from exc
 
             # Create a new wallet for this alias
             res = await self._client.create_agent_wallet(
                 agent_name=f"omniclaw-{alias}",
                 apply_default_guards=False,
             )
-            if isinstance(res, (tuple, list)):
+            if isinstance(res, tuple | list):
                 _, wallet = res
             else:
                 wallet = res
@@ -640,14 +826,30 @@ class WalletManager:
             if not wallet_id:
                 continue
             # Persist wallet_id/address into policy
-            self._policy.update_wallet_config(
-                alias,
-                {"wallet_id": wallet_id, "address": wallet_address},
-            )
-            changed = True
+            circle_enabled = bool(getattr(self._client.config, "enable_circle_transfer", True))
+            gateway_address = _client_signer_address(self._client)
+            state_updates = {
+                "wallet_id": wallet_id,
+                "circle_wallet_id": wallet_id if circle_enabled else None,
+                "circle_wallet_address": wallet_address if circle_enabled else None,
+                "gateway_eoa_address": gateway_address,
+                "signer_address": gateway_address,
+                "network": getattr(
+                    self._client.config.network, "value", self._client.config.network
+                ),
+            }
+            if self._state.set_wallet(alias, state_updates):
+                changed = True
             # Map all tokens sharing this alias
             for token in alias_to_tokens.get(alias, []):
                 cfg = dict(wallet_map.get(alias, {}))
+                cfg.update(
+                    {
+                        "wallet_id": wallet_id,
+                        "address": wallet_address,
+                        "gateway_eoa_address": gateway_address,
+                    }
+                )
                 cfg.setdefault("alias", alias)
                 self._policy.set_mapping(token, wallet_id, cfg)
                 results[token] = wallet_id
@@ -660,7 +862,7 @@ class WalletManager:
                 self._logger.error(f"Failed to apply policy guards for wallet '{wallet_id}': {e}")
 
         if changed:
-            self._policy.save()
+            self._state.save()
 
         return results
 

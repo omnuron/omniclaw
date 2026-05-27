@@ -136,7 +136,15 @@ class OmniClaw:
         if not entity_secret:
             entity_secret = os.environ.get("ENTITY_SECRET")
 
-        if circle_api_key and not entity_secret:
+        buyer_mode = os.environ.get("OMNICLAW_BUYER_MODE", "circle").strip().lower()
+        enable_circle_transfer_env = os.environ.get("OMNICLAW_ENABLE_CIRCLE_TRANSFER")
+        enable_circle_transfer = (
+            enable_circle_transfer_env.strip().lower() in {"1", "true", "yes", "on"}
+            if enable_circle_transfer_env is not None
+            else buyer_mode in {"hybrid", "circle"}
+        )
+
+        if circle_api_key and not entity_secret and enable_circle_transfer:
             from omniclaw.onboarding import load_managed_entity_secret
 
             managed_secret = load_managed_entity_secret(circle_api_key)
@@ -146,7 +154,7 @@ class OmniClaw:
                 self._logger.info("Loaded entity secret from managed OmniClaw config.")
 
         # Auto-setup entity secret if missing but API key is present
-        if circle_api_key and not entity_secret:
+        if circle_api_key and not entity_secret and enable_circle_transfer:
             self._logger.info("Entity secret not found. Running auto-setup...")
             try:
                 from omniclaw.onboarding import auto_setup_entity_secret
@@ -158,7 +166,9 @@ class OmniClaw:
                 raise
 
         if not circle_api_key:
-            self._logger.warning("CIRCLE_API_KEY not set. SDK will fail.")
+            self._logger.warning(
+                "CIRCLE_API_KEY not set. Circle transfer and Gateway rails will be unavailable."
+            )
 
         self._config = Config.from_env(
             circle_api_key=circle_api_key,
@@ -167,7 +177,7 @@ class OmniClaw:
         )
         self._enforce_production_startup_requirements()
 
-        if circle_api_key and entity_secret:
+        if circle_api_key and entity_secret and self._config.enable_circle_transfer:
             try:
                 from omniclaw.onboarding import store_managed_credentials
 
@@ -199,9 +209,12 @@ class OmniClaw:
             self._init_nanopayments()
 
         self._router = PaymentRouter(self._config, self._wallet_service)
-        self._router.register_adapter(TransferAdapter(self._config, self._wallet_service))
-        self._router.register_adapter(X402Adapter(self._config, self._wallet_service))
-        self._router.register_adapter(GatewayAdapter(self._config, self._wallet_service))
+        if self._config.enable_circle_transfer:
+            self._router.register_adapter(TransferAdapter(self._config, self._wallet_service))
+        if self._config.enable_x402_exact:
+            self._router.register_adapter(X402Adapter(self._config, self._wallet_service))
+        if self._config.enable_gateway:
+            self._router.register_adapter(GatewayAdapter(self._config, self._wallet_service))
 
         # Register NanopaymentProtocolAdapter if nanopayments initialized successfully
         if self._nano_adapter is not None:

@@ -242,9 +242,13 @@ class PaymentRouter:
         """
         amount_decimal = Decimal(str(amount))
 
-        # Resolve source network from wallet - MUST succeed
-        wallet = self._wallet_service.get_wallet(wallet_id)
-        source_network = Network.from_string(wallet.blockchain)
+        # Resolve source network from wallet when available. x402-only buyer
+        # profiles may use a synthetic wallet id backed by an EOA signer.
+        try:
+            wallet = self._wallet_service.get_wallet(wallet_id)
+            source_network = Network.from_string(wallet.blockchain)
+        except Exception:
+            source_network = self._config.network
         destination_chain = kwargs.pop("destination_chain", None)
 
         # Find adapter

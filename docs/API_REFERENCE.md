@@ -16,12 +16,12 @@ client = OmniClaw()
 await client.pay(
     wallet_id="wallet-id",
     recipient="https://paid.example.com/compute",
-    amount=None,
+    amount="0.10",
     idempotency_key="job-123",
 )
 ```
 
-Use `amount=None` for x402 URLs where the endpoint publishes the amount in `PAYMENT-REQUIRED`.
+For x402 URLs, `amount` is the maximum amount the buyer is willing to pay.
 
 ### Gateway Buyer Helpers
 
@@ -43,5 +43,17 @@ The local policy engine exposes buyer payment, wallet, ledger, policy, and x402 
 Start it with:
 
 ```bash
-docker compose up --build omniclaw-agent
+docker compose -f examples/agent/buyer/docker-compose.yml --env-file .env up --build
+```
+
+Agent requests use:
+
+```text
+Authorization: Bearer <agent-token>
+```
+
+Privileged guard-bypass and confirmation endpoints also require:
+
+```text
+X-Omniclaw-Owner-Token: <owner-token>
 ```

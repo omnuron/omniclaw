@@ -55,9 +55,14 @@ class SimulateRequest(BaseModel):
     """Simulation request."""
 
     recipient: str
-    amount: str
+    amount: str | None = None
     check_trust: bool = False
     skip_guards: bool = False
+    method: str = Field("GET", description="HTTP method for x402 URL payments")
+    body: str | None = Field(None, description="Request body for x402 URL payments")
+    headers: dict[str, str] | None = Field(
+        None, description="Request headers for x402 URL payments"
+    )
 
 
 class SimulateResponse(BaseModel):

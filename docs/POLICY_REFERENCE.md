@@ -25,14 +25,17 @@ Hot reload:
   "wallets": {
     "primary": {
       "name": "Primary Wallet",
-      "wallet_id": "wlt_...", 
-      "address": "0x...",
       "limits": {
         "daily_max": "100.00",
         "per_tx_max": "50.00"
       },
       "recipients": {
         "mode": "allow_all"
+      },
+      "rails": {
+        "circle_transfer": true,
+        "x402_exact": true,
+        "gateway": true
       }
     }
   }
@@ -53,8 +56,6 @@ Hot reload:
   "wallets": {
     "primary": {
       "name": "Primary Wallet",
-      "wallet_id": "wlt_...",
-      "address": "0x...",
       "limits": {
         "daily_max": "1000.00",
         "hourly_max": "200.00",
@@ -69,6 +70,11 @@ Hot reload:
         "mode": "whitelist",
         "addresses": ["0xSeller1...", "0xSeller2..."],
         "domains": ["api.service-a.com"]
+      },
+      "rails": {
+        "circle_transfer": true,
+        "x402_exact": true,
+        "gateway": true
       },
       "confirm_threshold": "50.00"
     }
@@ -105,11 +111,12 @@ Hot reload:
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Wallet name |
-| `wallet_id` | string | Circle Developer Wallet ID (auto-generated if missing) |
-| `address` | string | Circle Developer Wallet address (auto-filled if missing) |
+| `wallet_id` | string | Optional existing Circle Developer Wallet ID |
+| `address` | string | Optional expected Circle Developer Wallet address |
 | `limits` | object | Spending limits |
 | `rate_limits` | object | Rate limits |
 | `recipients` | object | Recipient rules |
+| `rails` | object | Buyer payment rails enabled for this wallet |
 | `confirm_threshold` | decimal | Amount requiring owner confirmation |
 
 ### limits
@@ -135,6 +142,16 @@ Hot reload:
 | `mode` | string | "whitelist", "blacklist", or "allow_all" |
 | `addresses` | array | List of allowed/blocked addresses |
 | `domains` | array | List of allowed/blocked domains (for x402 URLs) |
+
+### rails
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `circle_transfer` | boolean | Allow direct Circle Developer Wallet transfers |
+| `gateway` | boolean | Allow Circle Gateway routes |
+| `x402_exact` | boolean | Allow direct x402 exact payments signed by `OMNICLAW_PRIVATE_KEY` |
+
+Generated Circle wallet IDs and EOA addresses are stored in `OMNICLAW_AGENT_STATE_PATH`, not in `policy.json`. Keep policy files stable and reviewable.
 
 ---
 
@@ -285,9 +302,9 @@ Agent can pay everyone EXCEPT these addresses/domains.
 
 ---
 
-## Environment Override
+## SDK Environment Guard Defaults
 
-You can also set limits via environment variables instead of policy.json:
+When using the SDK directly, you can set default guard limits via environment variables:
 
 ```bash
 export OMNICLAW_DAILY_BUDGET="100.00"
@@ -296,7 +313,8 @@ export OMNICLAW_TX_LIMIT="25.00"
 export OMNICLAW_RATE_LIMIT_PER_MIN="10"
 ```
 
-These override policy.json values if set.
+The buyer server applies `policy.json` as its source of truth. Put server-side
+agent limits in the policy file.
 
 ---
 
@@ -305,3 +323,4 @@ These override policy.json values if set.
 - Simple: `examples/policy-simple.json`
 - Advanced: `examples/policy-advanced.json`
 - Default: `examples/default-policy.json`
+- Buyer server template: `examples/agent/buyer/policy.example.json`
