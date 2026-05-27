@@ -20,6 +20,11 @@ if TYPE_CHECKING:
     from omniclaw.protocols.nanopayments.client import NanopaymentClient
 
 from omniclaw.audit import BuyerAuditLog
+from omniclaw.core.authorization import (
+    bind_authorization,
+    build_authorization_snapshot,
+    verify_authorization_binding,
+)
 from omniclaw.core.config import Config
 from omniclaw.core.exceptions import (
     ConfigurationError,
@@ -28,11 +33,6 @@ from omniclaw.core.exceptions import (
     PaymentOutcomeUnknownError,
     TransactionTimeoutError,
     ValidationError,
-)
-from omniclaw.core.authorization import (
-    bind_authorization,
-    build_authorization_snapshot,
-    verify_authorization_binding,
 )
 from omniclaw.core.idempotency import derive_idempotency_key
 from omniclaw.core.state_machine import is_irreversible_success_status
