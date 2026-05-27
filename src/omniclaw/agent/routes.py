@@ -528,8 +528,11 @@ async def get_detailed_balance(
         )
 
     eoa_address = _client_signer_address(client)
-    circle_address = await wallet_mgr.get_wallet_address(agent.wallet_id)
-    circle_balance = await wallet_mgr.get_wallet_balance(agent.wallet_id)
+    circle_address = None
+    circle_balance = None
+    if _server_rail_enabled(client, "circle_transfer"):
+        circle_address = await wallet_mgr.get_wallet_address(agent.wallet_id)
+        circle_balance = await wallet_mgr.get_wallet_balance(agent.wallet_id)
     gateway_balance = None
     gateway_onchain_balance = None
     gateway_balance_note = None
@@ -551,11 +554,9 @@ async def get_detailed_balance(
                 "Generic Gateway on-chain balance unavailable without configured Gateway "
                 f"metadata: {exc}"
             )
-    payment_address = (
-        await client.get_payment_address(agent.wallet_id) if client._nano_client else None
-    )
+    payment_address = eoa_address if client._nano_adapter else None
     payment_gateway_balance = None
-    if payment_address:
+    if payment_address and client._nano_client and client._nano_client.has_api_key:
         try:
             payment_gateway_balance = await client.get_gateway_balance_for_address(payment_address)
         except Exception:
