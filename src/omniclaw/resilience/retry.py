@@ -10,6 +10,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from omniclaw.core.exceptions import PaymentOutcomeUnknownError, TransactionTimeoutError
+
 try:
     from tenacity import (
         AsyncRetrying,
@@ -34,6 +36,8 @@ except ImportError:
 
 def is_transient_error(exception: Exception) -> bool:
     """Check if exception is a transient network/infrastructure error."""
+    if isinstance(exception, (PaymentOutcomeUnknownError, TransactionTimeoutError)):
+        return False
     msg = str(exception).lower()
     return any(
         x in msg

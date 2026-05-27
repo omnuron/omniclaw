@@ -215,6 +215,7 @@ class PaymentStatus(str, Enum):
     """Payment transaction status."""
 
     AUTHORIZED = "authorized"  # Authorization created but settlement not started
+    OUTCOME_UNKNOWN = "outcome_unknown"  # Attempt may have reached rail; final outcome unknown
     PENDING_SETTLEMENT = "pending_settlement"  # Submitted and awaiting final settlement
     SETTLED = "settled"  # Irreversible settlement confirmed
     FAILED_FINAL = "failed_final"  # Irreversible terminal failure
@@ -232,6 +233,7 @@ class PaymentIntentStatus(str, Enum):
     REQUIRES_CONFIRMATION = "requires_confirmation"  # Created, ready to confirm
     REQUIRES_REVIEW = "requires_review"  # Created, but TrustGate HELD
     PROCESSING = "processing"  # Executive in progress
+    REQUIRES_SETTLEMENT_CHECK = "requires_settlement_check"  # Outcome unknown; do not replay
     SUCCEEDED = "succeeded"  # Completed successfully
     CANCELED = "canceled"  # Canceled by user/agent
     FAILED = "failed"  # Execution failed

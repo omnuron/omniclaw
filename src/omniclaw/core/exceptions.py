@@ -298,6 +298,28 @@ class TransactionTimeoutError(PaymentError):
         self.timeout_seconds = timeout_seconds
 
 
+class PaymentOutcomeUnknownError(PaymentError):
+    """
+    Payment attempt outcome is unknown and must not be blindly retried.
+
+    Raised when a payment call may have reached the settlement rail, but the
+    caller cannot yet prove success or non-settlement.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        transaction_id: str | None = None,
+        blockchain_tx: str | None = None,
+        recipient: str | None = None,
+        amount: Decimal | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, recipient=recipient, amount=amount, details=details)
+        self.transaction_id = transaction_id
+        self.blockchain_tx = blockchain_tx
+
+
 class IdempotencyError(PaymentError):
     """
     Idempotency key conflict.

@@ -7,6 +7,7 @@ from omniclaw.core.types import PaymentIntentStatus, PaymentStatus
 
 _PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
     PaymentStatus.AUTHORIZED: {
+        PaymentStatus.OUTCOME_UNKNOWN,
         PaymentStatus.PENDING_SETTLEMENT,
         PaymentStatus.PROCESSING,
         PaymentStatus.SETTLED,
@@ -15,6 +16,7 @@ _PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
     },
     PaymentStatus.PENDING: {
         PaymentStatus.AUTHORIZED,
+        PaymentStatus.OUTCOME_UNKNOWN,
         PaymentStatus.PROCESSING,
         PaymentStatus.PENDING_SETTLEMENT,
         PaymentStatus.SETTLED,
@@ -24,6 +26,7 @@ _PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
         PaymentStatus.BLOCKED,
     },
     PaymentStatus.PROCESSING: {
+        PaymentStatus.OUTCOME_UNKNOWN,
         PaymentStatus.PENDING_SETTLEMENT,
         PaymentStatus.SETTLED,
         PaymentStatus.FAILED,
@@ -31,8 +34,14 @@ _PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
         PaymentStatus.CANCELLED,
     },
     PaymentStatus.PENDING_SETTLEMENT: {
+        PaymentStatus.OUTCOME_UNKNOWN,
         PaymentStatus.SETTLED,
         PaymentStatus.FAILED,
+        PaymentStatus.FAILED_FINAL,
+    },
+    PaymentStatus.OUTCOME_UNKNOWN: {
+        PaymentStatus.PENDING_SETTLEMENT,
+        PaymentStatus.SETTLED,
         PaymentStatus.FAILED_FINAL,
     },
     PaymentStatus.COMPLETED: set(),
@@ -57,6 +66,11 @@ _INTENT_TRANSITIONS: dict[PaymentIntentStatus, set[PaymentIntentStatus]] = {
         PaymentIntentStatus.FAILED,
     },
     PaymentIntentStatus.PROCESSING: {
+        PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK,
+        PaymentIntentStatus.SUCCEEDED,
+        PaymentIntentStatus.FAILED,
+    },
+    PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK: {
         PaymentIntentStatus.SUCCEEDED,
         PaymentIntentStatus.FAILED,
     },

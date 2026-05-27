@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
+import json
 import os
 import re
 import uuid
@@ -17,12 +19,20 @@ import httpx
 if TYPE_CHECKING:
     from omniclaw.protocols.nanopayments.client import NanopaymentClient
 
+from omniclaw.audit import BuyerAuditLog
 from omniclaw.core.config import Config
 from omniclaw.core.exceptions import (
     ConfigurationError,
     InsufficientBalanceError,
     PaymentError,
+    PaymentOutcomeUnknownError,
+    TransactionTimeoutError,
     ValidationError,
+)
+from omniclaw.core.authorization import (
+    bind_authorization,
+    build_authorization_snapshot,
+    verify_authorization_binding,
 )
 from omniclaw.core.idempotency import derive_idempotency_key
 from omniclaw.core.state_machine import is_irreversible_success_status
@@ -174,6 +184,7 @@ class OmniClaw:
             os.environ.get("OMNICLAW_REQUIRE_TRUST_GATE", "false").lower() == "true"
         )
         self._ledger = Ledger(self._storage)
+        self._audit = BuyerAuditLog(self._storage)
         self._fund_lock = FundLockService(self._storage)
         self._guard_manager = GuardManager(self._storage)
         self._wallet_service = WalletService(
@@ -297,6 +308,50 @@ class OmniClaw:
             return False
         return cls._route_value(detected_route) == PaymentMethod.NANOPAYMENT.value
 
+    async def _policy_snapshot_hash(
+        self,
+        wallet_id: str,
+        wallet_set_id: str | None = None,
+    ) -> str:
+        """Hash the stored buyer-side guard policy visible to a payment request."""
+        snapshot: dict[str, Any] = {"wallet": None, "wallet_set": None}
+        wallet_policy = await self._storage.get("guard_registrations", f"wallet:{wallet_id}")
+        snapshot["wallet"] = wallet_policy or {"guards": []}
+        if wallet_set_id:
+            set_policy = await self._storage.get(
+                "guard_registrations", f"wallet_set:{wallet_set_id}"
+            )
+            snapshot["wallet_set"] = set_policy or {"guards": []}
+
+        canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _intent_authorization_snapshot(self, intent: PaymentIntent) -> dict[str, Any]:
+        metadata = intent.metadata or {}
+        return build_authorization_snapshot(
+            wallet_id=intent.wallet_id,
+            recipient=intent.recipient,
+            amount=intent.amount,
+            currency=intent.currency,
+            purpose=intent.purpose,
+            expires_at=intent.expires_at,
+            route=metadata.get("simulated_route"),
+            idempotency_key=metadata.get("idempotency_key"),
+            policy_snapshot_hash=metadata.get("policy_snapshot_hash"),
+        )
+
+    def _verify_intent_authorization(self, intent: PaymentIntent) -> None:
+        metadata = intent.metadata or {}
+        current_snapshot = self._intent_authorization_snapshot(intent)
+        if not verify_authorization_binding(
+            stored_snapshot=metadata.get("authorization_snapshot"),
+            stored_digest=metadata.get("authorization_digest"),
+            current_snapshot=current_snapshot,
+        ):
+            raise ValidationError(
+                "Payment intent authorization binding mismatch; refusing execution."
+            )
+
     def _init_nanopayments(self) -> None:
         """Initialize nanopayments components (direct private key only)."""
         if not self._config.nanopayments_enabled:
@@ -373,6 +428,11 @@ class OmniClaw:
     def ledger(self) -> Ledger:
         """Get the transaction ledger."""
         return self._ledger
+
+    @property
+    def audit(self) -> BuyerAuditLog:
+        """Get the buyer-side audit reconstruction log."""
+        return self._audit
 
     @property
     def webhooks(self) -> WebhookParser:
@@ -982,6 +1042,20 @@ class OmniClaw:
             metadata=meta,
         )
         await self._ledger.record(ledger_entry)
+        await self._audit.record(
+            "payment.requested",
+            wallet_id=wallet_id,
+            intent_id=consume_intent_id,
+            ledger_entry_id=ledger_entry.id,
+            correlation_id=idempotency_key,
+            payload={
+                "recipient": recipient,
+                "amount": str(amount_decimal),
+                "purpose": purpose,
+                "idempotency_key": idempotency_key,
+                "trust": trust_result.to_dict() if trust_result else None,
+            },
+        )
 
         guards_chain = None
         reservation_tokens = []
@@ -1023,6 +1097,17 @@ class OmniClaw:
                 # Reserve budget/limits first (atomic counters)
                 reservation_tokens = await guards_chain.reserve(context)
                 guards_passed = [g.name for g in guards_chain]
+                await self._audit.record(
+                    "policy.reserved",
+                    wallet_id=wallet_id,
+                    intent_id=consume_intent_id,
+                    ledger_entry_id=ledger_entry.id,
+                    correlation_id=idempotency_key,
+                    payload={
+                        "guards": guards_passed,
+                        "reservation_token_count": len(reservation_tokens),
+                    },
+                )
             except Exception as e:
                 from omniclaw.guards.confirm import ConfirmRequiredError
 
@@ -1049,6 +1134,14 @@ class OmniClaw:
                         },
                     )
                 if isinstance(e, ValueError):
+                    await self._audit.record(
+                        "policy.blocked",
+                        wallet_id=wallet_id,
+                        intent_id=consume_intent_id,
+                        ledger_entry_id=ledger_entry.id,
+                        correlation_id=idempotency_key,
+                        payload={"reason": str(e)},
+                    )
                     return PaymentResult(
                         success=False,
                         transaction_id=None,
@@ -1163,6 +1256,18 @@ class OmniClaw:
             async with circuit:
                 if lock_lost_event.is_set():
                     raise PaymentError("Wallet lock lease was lost before payment execution.")
+                await self._audit.record(
+                    "execution.attempted",
+                    wallet_id=wallet_id,
+                    intent_id=consume_intent_id,
+                    ledger_entry_id=ledger_entry.id,
+                    correlation_id=idempotency_key,
+                    payload={
+                        "recipient": recipient,
+                        "amount": str(amount_decimal),
+                        "route": self._route_value(detected_route),
+                    },
+                )
                 if strategy == PaymentStrategy.RETRY_THEN_FAIL:
                     result = await execute_with_retry(
                         self._router.pay,
@@ -1198,7 +1303,19 @@ class OmniClaw:
                     raise PaymentError("Wallet lock lease was lost during payment execution.")
 
             # 3. Success Handling
-            if result.success or (
+            if result.status == PaymentStatus.OUTCOME_UNKNOWN:
+                if consume_intent_id:
+                    await self._reservation.reserve(wallet_id, amount_decimal, consume_intent_id)
+                await self._ledger.update_status(
+                    ledger_entry.id,
+                    LedgerEntryStatus.OUTCOME_UNKNOWN,
+                    result.blockchain_tx,
+                    metadata_updates={
+                        "transaction_id": result.transaction_id,
+                        "outcome_unknown": True,
+                    },
+                )
+            elif result.success or (
                 result.status
                 in (
                     PaymentStatus.AUTHORIZED,
@@ -1252,9 +1369,67 @@ class OmniClaw:
                 if guards_chain:
                     await guards_chain.release(reservation_tokens)
 
+            await self._audit.record(
+                "payment.outcome_recorded",
+                wallet_id=wallet_id,
+                intent_id=consume_intent_id,
+                ledger_entry_id=ledger_entry.id,
+                correlation_id=idempotency_key,
+                payload={
+                    "success": result.success,
+                    "status": result.status.value,
+                    "transaction_id": result.transaction_id,
+                    "blockchain_tx": result.blockchain_tx,
+                },
+            )
             return result
 
         except Exception as e:
+            if isinstance(e, (PaymentOutcomeUnknownError, TransactionTimeoutError)):
+                tx_id = getattr(e, "transaction_id", None)
+                tx_hash = getattr(e, "blockchain_tx", None)
+                if consume_intent_id:
+                    await self._reservation.reserve(wallet_id, amount_decimal, consume_intent_id)
+                await self._ledger.update_status(
+                    ledger_entry.id,
+                    LedgerEntryStatus.OUTCOME_UNKNOWN,
+                    tx_hash=tx_hash,
+                    metadata_updates={
+                        "error": str(e),
+                        "outcome_unknown": True,
+                        "transaction_id": tx_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+                await self._audit.record(
+                    "payment.outcome_unknown",
+                    wallet_id=wallet_id,
+                    intent_id=consume_intent_id,
+                    ledger_entry_id=ledger_entry.id,
+                    correlation_id=idempotency_key,
+                    payload={
+                        "error": str(e),
+                        "transaction_id": tx_id,
+                        "blockchain_tx": tx_hash,
+                    },
+                )
+                return PaymentResult(
+                    success=False,
+                    transaction_id=tx_id,
+                    blockchain_tx=tx_hash,
+                    amount=amount_decimal,
+                    recipient=recipient,
+                    method=detected_route,
+                    status=PaymentStatus.OUTCOME_UNKNOWN,
+                    error=str(e),
+                    guards_passed=guards_passed,
+                    metadata={
+                        "outcome_unknown": True,
+                        "ledger_entry_id": ledger_entry.id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+
             # 4. Failure Handling & Queueing
             if strategy == PaymentStrategy.QUEUE_BACKGROUND:
                 if execution_result and (
@@ -1646,9 +1821,14 @@ class OmniClaw:
                             return existing_intent
 
             metadata = kwargs.copy()
+            policy_snapshot_hash = await self._policy_snapshot_hash(
+                wallet_id,
+                wallet_set_id=kwargs.get("wallet_set_id"),
+            )
             metadata.update(
                 {
                     "idempotency_key": idempotency_key,
+                    "policy_snapshot_hash": policy_snapshot_hash,
                     "simulated_route": getattr(sim_result.route, "value", str(sim_result.route)),
                 }
             )
@@ -1669,6 +1849,23 @@ class OmniClaw:
                 purpose=purpose,
                 expires_in=expires_in,
                 metadata=metadata,
+            )
+
+            auth_snapshot = self._intent_authorization_snapshot(intent)
+            intent = await self._intent_service.update_metadata(
+                intent.id,
+                bind_authorization(auth_snapshot),
+            )
+            await self._audit.record(
+                "intent.authorized",
+                wallet_id=wallet_id,
+                intent_id=intent.id,
+                correlation_id=idempotency_key,
+                payload={
+                    "authorization_digest": intent.metadata.get("authorization_digest"),
+                    "policy_snapshot_hash": policy_snapshot_hash,
+                    "route": metadata.get("simulated_route"),
+                },
             )
 
             # If the transaction requires manual review, map it to the correct Intent State
@@ -1720,6 +1917,8 @@ class OmniClaw:
             if not approved:
                 raise ValidationError("Intent requires manual trust approval before confirmation.")
 
+        self._verify_intent_authorization(intent)
+
         # Check expiry
         if intent.expires_at:
             from datetime import datetime, timezone
@@ -1736,13 +1935,27 @@ class OmniClaw:
         try:
             # Update to Processing
             await self._intent_service.update_status(intent.id, PaymentIntentStatus.PROCESSING)
+            await self._audit.record(
+                "intent.execution_started",
+                wallet_id=intent.wallet_id,
+                intent_id=intent.id,
+                correlation_id=(intent.metadata or {}).get("idempotency_key"),
+                payload={
+                    "authorization_digest": (intent.metadata or {}).get(
+                        "authorization_digest"
+                    )
+                },
+            )
 
             # Prepare exec args from intent + metadata
             exec_kwargs = intent.metadata.copy()
 
             # Remove internal metadata keys that aren't for routing
-            purpose = exec_kwargs.pop("purpose", None)
+            purpose = exec_kwargs.pop("purpose", intent.purpose)
             idempotency_key = exec_kwargs.pop("idempotency_key", None)
+            exec_kwargs.pop("authorization_snapshot", None)
+            exec_kwargs.pop("authorization_digest", None)
+            exec_kwargs.pop("policy_snapshot_hash", None)
             exec_kwargs.pop("simulated_route", None)
             exec_kwargs.pop("trust_status", None)
             exec_kwargs.pop("trust_reason", None)
@@ -1762,6 +1975,10 @@ class OmniClaw:
 
             if result.success:
                 await self._intent_service.update_status(intent.id, PaymentIntentStatus.SUCCEEDED)
+            elif result.status == PaymentStatus.OUTCOME_UNKNOWN:
+                await self._intent_service.update_status(
+                    intent.id, PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK
+                )
             else:
                 await self._reservation.release(intent.id)
                 await self._intent_service.update_status(intent.id, PaymentIntentStatus.FAILED)
@@ -1769,6 +1986,11 @@ class OmniClaw:
             return result
 
         except Exception as e:
+            if isinstance(e, (PaymentOutcomeUnknownError, TransactionTimeoutError)):
+                await self._intent_service.update_status(
+                    intent.id, PaymentIntentStatus.REQUIRES_SETTLEMENT_CHECK
+                )
+                raise e
             # Mark failed on exception
             await self._reservation.release(intent.id)
             await self._intent_service.update_status(intent.id, PaymentIntentStatus.FAILED)
@@ -1883,11 +2105,19 @@ class OmniClaw:
         limit: int = 100,
     ) -> list[LedgerEntry]:
         """List ledger entries awaiting settlement finalization."""
-        return await self._ledger.query(
+        pending = await self._ledger.query(
             wallet_id=wallet_id,
             status=LedgerEntryStatus.PENDING,
             limit=limit,
         )
+        unknown = await self._ledger.query(
+            wallet_id=wallet_id,
+            status=LedgerEntryStatus.OUTCOME_UNKNOWN,
+            limit=limit,
+        )
+        entries = [*pending, *unknown]
+        entries.sort(key=lambda entry: entry.timestamp, reverse=True)
+        return entries[:limit]
 
     async def finalize_pending_settlement(
         self,
@@ -1907,8 +2137,10 @@ class OmniClaw:
         entry = await self._ledger.get(entry_id)
         if not entry:
             raise ValidationError(f"Ledger entry not found: {entry_id}")
-        if entry.status != LedgerEntryStatus.PENDING:
-            raise ValidationError(f"Ledger entry is not pending settlement: {entry.status.value}")
+        if entry.status not in (LedgerEntryStatus.PENDING, LedgerEntryStatus.OUTCOME_UNKNOWN):
+            raise ValidationError(
+                f"Ledger entry is not pending or outcome-unknown: {entry.status.value}"
+            )
 
         final_status = LedgerEntryStatus.COMPLETED if settled else LedgerEntryStatus.FAILED
         merged_updates = {
