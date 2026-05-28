@@ -2465,8 +2465,8 @@ class OmniClaw:
 
         Args:
             wallet_id: Target wallet ID
-            daily_limit: Max spend per 24h
-            hourly_limit: Max spend per 1h
+            daily_limit: Max spend per calendar day bucket
+            hourly_limit: Max spend per calendar hour bucket
             total_limit: Max total spend (lifetime)
             name: Custom name for the guard
         """
@@ -2494,8 +2494,8 @@ class OmniClaw:
 
         Args:
             wallet_set_id: Target wallet set ID
-            daily_limit: Max spend per 24h
-            hourly_limit: Max spend per 1h
+            daily_limit: Max spend per calendar day bucket
+            hourly_limit: Max spend per calendar hour bucket
             total_limit: Max total spend (lifetime)
             name: Custom name for the guard
         """

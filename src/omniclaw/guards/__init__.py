@@ -10,20 +10,25 @@ Provides various guards to control and limit agent spending:
 
 Example:
     >>> from omniclaw.guards import BudgetGuard, SingleTxGuard, GuardChain
+    >>> from omniclaw.storage.memory import InMemoryStorage
     >>> from decimal import Decimal
     >>>
     >>> # Create guards
-    >>> budget = BudgetGuard(daily_limit=Decimal("100"))
+    >>> storage = InMemoryStorage()
+    >>> budget = BudgetGuard(daily_limit=Decimal("100"), storage=storage)
     >>> max_tx = SingleTxGuard(max_amount=Decimal("25"))
     >>>
     >>> # Combine into chain
     >>> chain = GuardChain([max_tx, budget])
     >>>
-    >>> # Check payments
-    >>> result = await chain.check(payment_context)
-    >>> if result.allowed:
-    ...     # Proceed with payment
-    ...     budget.record_spending(payment_context.amount)
+    >>> # Reserve before execution, then commit or release after outcome
+    >>> tokens = await chain.reserve(payment_context)
+    >>> try:
+    ...     # Proceed with payment execution
+    ...     await chain.commit(tokens)
+    ... except Exception:
+    ...     await chain.release(tokens)
+    ...     raise
 """
 
 from omniclaw.guards.base import (
