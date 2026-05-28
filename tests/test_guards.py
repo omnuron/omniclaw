@@ -161,40 +161,6 @@ class TestBudgetGuard:
         assert reserved == "0.00"
 
     @pytest.mark.asyncio
-    async def test_legacy_reservation_token_can_commit_once(self):
-        import json
-
-        storage = InMemoryStorage()
-        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
-        await storage.atomic_add("guard_state", "budget:wallet-123:budget:total:reserved", "10.00")
-        token = json.dumps({"v": 2, "w": "wallet-123", "a": "10.00", "ts": "2026-05-28T10:00:00"})
-
-        await guard.commit(token)
-        await guard.commit(token)
-
-        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
-        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
-        assert total == "10.00"
-        assert reserved == "0.00"
-
-    @pytest.mark.asyncio
-    async def test_legacy_reservation_token_can_release_once(self):
-        import json
-
-        storage = InMemoryStorage()
-        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
-        await storage.atomic_add("guard_state", "budget:wallet-123:budget:total:reserved", "10.00")
-        token = json.dumps({"v": 2, "w": "wallet-123", "a": "10.00", "ts": "2026-05-28T10:00:00"})
-
-        await guard.release(token)
-        await guard.release(token)
-
-        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
-        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
-        assert total is None
-        assert reserved == "0.00"
-
-    @pytest.mark.asyncio
     async def test_hourly_limit(self, payment_context):
         guard = BudgetGuard(hourly_limit=Decimal("5.00"), storage=InMemoryStorage())
         # Check logic: check() method still works for pre-flight

@@ -7,7 +7,6 @@ Tracks cumulative spending and enforces daily/hourly/total budgets.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -247,9 +246,6 @@ class BudgetGuard(Guard):
     def _reservation_key(self, reservation_id: str) -> str:
         return f"budget_reservation:{self.name}:{reservation_id}"
 
-    def _legacy_reservation_id(self, token: str) -> str:
-        return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
     def _limit_type_from_reservation_result(
         self,
         result: str,
@@ -271,35 +267,6 @@ class BudgetGuard(Guard):
         import json
 
         data = json.loads(token)
-        if data.get("v") == 2:
-            reservation_id = self._legacy_reservation_id(token)
-            key = self._reservation_key(reservation_id)
-            if not self._storage:
-                raise ValueError("Budget guard storage is not configured")
-
-            locks = await self._acquire_period_locks({"legacy": f"legacy:{key}"})
-            try:
-                record = await self._storage.get("guard_state", key)
-                if record:
-                    return key, record
-
-                wallet_id = str(data["w"])
-                amount = str(data["a"])
-                ts = datetime.fromisoformat(data["ts"])
-                legacy_record = {
-                    "id": reservation_id,
-                    "status": "reserved",
-                    "wallet_id": wallet_id,
-                    "amount": amount,
-                    "period_keys": list(self._get_period_keys(wallet_id, ts).values()),
-                    "created_at": ts.isoformat(),
-                    "migrated_from_token_v": 2,
-                }
-                await self._storage.save("guard_state", key, legacy_record)
-                return key, legacy_record
-            finally:
-                await self._release_period_locks(locks)
-
         if data.get("v") != 3:
             raise ValueError("Unsupported budget reservation token")
 

@@ -38,7 +38,9 @@ async def test_redis_budget_reservation_lifecycle_is_single_use():
     storage = await _redis_or_skip()
     try:
         guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
-        context = PaymentContext(wallet_id="wallet-redis", recipient="0x123", amount=Decimal("10.00"))
+        context = PaymentContext(
+            wallet_id="wallet-redis", recipient="0x123", amount=Decimal("10.00")
+        )
 
         token = await guard.reserve(context)
         await guard.commit(token)

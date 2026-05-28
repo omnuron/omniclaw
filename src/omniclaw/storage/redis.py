@@ -307,7 +307,7 @@ class RedisStorage(StorageBackend):
             result = await client.eval(self._RELEASE_LOCK_SCRIPT, 1, redis_key, token)
             return int(result) > 0
         else:
-            # Fallback: simple delete (legacy callers)
+            # Tokenless release is unsafe for shared locks but kept for the base API contract.
             result = await client.delete(redis_key)
             return result > 0
 
