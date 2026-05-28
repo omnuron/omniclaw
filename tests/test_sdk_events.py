@@ -9,7 +9,6 @@ All tests mock the event_emitter so no Redis is required.
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -55,15 +54,15 @@ class TestBudgetGuardEvents:
     async def test_check_exceed_emits_budget_exceeded(self, mock_emitter):
         from omniclaw.guards.base import PaymentContext
         from omniclaw.guards.budget import BudgetGuard
+        from omniclaw.storage.memory import InMemoryStorage
 
-        storage = AsyncMock()
-        # Mock get to return high spend data
-        storage.get.return_value = {
-            "total": "990",
-            "history": [{"ts": datetime.now().isoformat(), "amount": "990"}],
-        }
-
+        storage = InMemoryStorage()
         guard = BudgetGuard(daily_limit=Decimal("1000"), storage=storage)
+        spent_context = PaymentContext(
+            wallet_id="w-1", recipient="0xabc", amount=Decimal("990"), purpose="seed"
+        )
+        token = await guard.reserve(spent_context)
+        await guard.commit(token)
 
         context = PaymentContext(
             wallet_id="w-1", recipient="0xabc", amount=Decimal("50"), purpose="test"
@@ -80,15 +79,15 @@ class TestBudgetGuardEvents:
         """Budget > 80% but still allowed should emit approaching warning."""
         from omniclaw.guards.base import PaymentContext
         from omniclaw.guards.budget import BudgetGuard
+        from omniclaw.storage.memory import InMemoryStorage
 
-        storage = AsyncMock()
-        # 85% consumed (850 of 1000)
-        storage.get.return_value = {
-            "total": "850",
-            "history": [{"ts": datetime.now().isoformat(), "amount": "850"}],
-        }
-
+        storage = InMemoryStorage()
         guard = BudgetGuard(daily_limit=Decimal("1000"), storage=storage)
+        spent_context = PaymentContext(
+            wallet_id="w-1", recipient="0xabc", amount=Decimal("850"), purpose="seed"
+        )
+        token = await guard.reserve(spent_context)
+        await guard.commit(token)
 
         context = PaymentContext(
             wallet_id="w-1", recipient="0xabc", amount=Decimal("10"), purpose="test"

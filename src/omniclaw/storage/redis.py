@@ -102,7 +102,10 @@ class RedisStorage(StorageBackend):
             return None
 
         try:
-            return json.loads(data)
+            parsed = json.loads(data)
+            if isinstance(parsed, dict):
+                return parsed
+            return {"value": parsed}
         except json.JSONDecodeError:
             # Fallback for keys created via atomic_add (raw strings)
             return {"value": data}
@@ -170,6 +173,94 @@ class RedisStorage(StorageBackend):
     end
     """
 
+    _BUDGET_RESERVE_SCRIPT = """
+    if redis.call("get", KEYS[1]) then
+        return "exists"
+    end
+
+    local amount = tonumber(ARGV[1])
+    local amount_units = tonumber(ARGV[4])
+    local count = tonumber(ARGV[3])
+    local scale = tonumber(ARGV[5])
+    if not amount or not amount_units or not count or not scale then
+        return "invalid_input"
+    end
+
+    for i = 1, count do
+        local main_value = redis.call("get", KEYS[1 + i]) or "0"
+        local reserved_value = redis.call("get", KEYS[1 + count + i]) or "0"
+        local limit_units = tonumber(ARGV[5 + i])
+        local main = tonumber(main_value)
+        local reserved = tonumber(reserved_value)
+
+        if not main or not reserved or not limit_units then
+            return "counter_corrupt"
+        end
+
+        local used_units = math.floor((main + reserved) * scale + 0.5)
+        if used_units + amount_units > limit_units then
+            return "limit_exceeded:" .. tostring(i)
+        end
+    end
+
+    redis.call("set", KEYS[1], ARGV[2])
+
+    for i = 1, count do
+        redis.call("INCRBYFLOAT", KEYS[1 + count + i], ARGV[1])
+    end
+
+    return "reserved"
+    """
+
+    _BUDGET_COMMIT_SCRIPT = """
+    local record = redis.call("get", KEYS[1])
+    if not record then
+        return "missing"
+    end
+
+    local data = cjson.decode(record)
+    if data["status"] ~= "reserved" then
+        return data["status"]
+    end
+
+    local amount = ARGV[1]
+    local count = tonumber(ARGV[3])
+
+    for i = 1, count do
+        redis.call("INCRBYFLOAT", KEYS[1 + i], amount)
+        redis.call("INCRBYFLOAT", KEYS[1 + count + i], "-" .. amount)
+    end
+
+    data["status"] = "committed"
+    data["committed_at"] = ARGV[2]
+    redis.call("set", KEYS[1], cjson.encode(data))
+    return "committed"
+    """
+
+    _BUDGET_RELEASE_SCRIPT = """
+    local record = redis.call("get", KEYS[1])
+    if not record then
+        return "missing"
+    end
+
+    local data = cjson.decode(record)
+    if data["status"] ~= "reserved" then
+        return data["status"]
+    end
+
+    local amount = ARGV[1]
+    local count = tonumber(ARGV[3])
+
+    for i = 1, count do
+        redis.call("INCRBYFLOAT", KEYS[1 + i], "-" .. amount)
+    end
+
+    data["status"] = "released"
+    data["released_at"] = ARGV[2]
+    redis.call("set", KEYS[1], cjson.encode(data))
+    return "released"
+    """
+
     async def acquire_lock(
         self,
         key: str,
@@ -232,6 +323,97 @@ class RedisStorage(StorageBackend):
         result = await client.eval(self._REFRESH_LOCK_SCRIPT, 1, redis_key, token, ttl)
         return int(result) > 0
 
+    async def create_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_limits: dict[str, str],
+        amount: str,
+        record: dict[str, Any],
+    ) -> str:
+        """Atomically create a budget reservation if every period has capacity."""
+        client = self._get_client()
+        period_keys = list(period_limits.keys())
+        main_keys = [self._make_key(collection, key) for key in period_keys]
+        reserved_keys = [self._make_key(collection, f"{key}:reserved") for key in period_keys]
+        keys = [self._make_key(collection, reservation_key), *main_keys, *reserved_keys]
+        amount_str = str(Decimal(str(amount)))
+        scale = Decimal("1000000")
+        amount_units = str(int((Decimal(amount_str) * scale).to_integral_exact()))
+        result = await client.eval(
+            self._BUDGET_RESERVE_SCRIPT,
+            len(keys),
+            *keys,
+            amount_str,
+            json.dumps(record),
+            str(len(period_keys)),
+            amount_units,
+            str(int(scale)),
+            *[
+                str(int((Decimal(str(limit)) * scale).to_integral_exact()))
+                for limit in period_limits.values()
+            ],
+        )
+
+        if result == "reserved":
+            index_key = f"{self._prefix}:{collection}:_index"
+            await client.sadd(
+                index_key,
+                reservation_key,
+                *period_keys,
+                *[f"{key}:reserved" for key in period_keys],
+            )
+        return str(result)
+
+    async def commit_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        committed_at: str,
+    ) -> str:
+        """Atomically commit a budget reservation and mark it single-use."""
+        client = self._get_client()
+        main_keys = [self._make_key(collection, key) for key in period_keys]
+        reserved_keys = [self._make_key(collection, f"{key}:reserved") for key in period_keys]
+        keys = [self._make_key(collection, reservation_key), *main_keys, *reserved_keys]
+        result = await client.eval(
+            self._BUDGET_COMMIT_SCRIPT,
+            len(keys),
+            *keys,
+            str(Decimal(str(amount))),
+            committed_at,
+            str(len(period_keys)),
+        )
+
+        if result == "committed":
+            index_key = f"{self._prefix}:{collection}:_index"
+            await client.sadd(index_key, *period_keys, *[f"{key}:reserved" for key in period_keys])
+        return str(result)
+
+    async def release_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        released_at: str,
+    ) -> str:
+        """Atomically release a budget reservation and mark it single-use."""
+        client = self._get_client()
+        reserved_keys = [self._make_key(collection, f"{key}:reserved") for key in period_keys]
+        keys = [self._make_key(collection, reservation_key), *reserved_keys]
+        result = await client.eval(
+            self._BUDGET_RELEASE_SCRIPT,
+            len(keys),
+            *keys,
+            str(Decimal(str(amount))),
+            released_at,
+            str(len(period_keys)),
+        )
+        return str(result)
+
     async def query(
         self,
         collection: str,
@@ -251,6 +433,8 @@ class RedisStorage(StorageBackend):
             data = await self.get(collection, key)
             if data is None:
                 continue
+            if not isinstance(data, dict):
+                data = {"value": data}
 
             # Apply filters
             if filters:

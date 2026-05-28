@@ -100,6 +100,9 @@ class FileStorage(StorageBackend):
 
         results = []
         for key, value in data.items():
+            if not isinstance(value, dict):
+                value = {"value": value}
+
             if filters:
                 match = True
                 for filter_key, filter_value in filters.items():
@@ -172,6 +175,94 @@ class FileStorage(StorageBackend):
 
             await self._write_collection(collection, data)
             return str(new_val)
+
+    async def create_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_limits: dict[str, str],
+        amount: str,
+        record: dict[str, Any],
+    ) -> str:
+        """Atomically create a budget reservation if every period has capacity."""
+        async with self._lock:
+            data = await self._read_collection(collection)
+            amount_dec = Decimal(str(amount))
+
+            for period_key, limit in period_limits.items():
+                main = Decimal(str(data.get(period_key, "0")))
+                reserved = Decimal(str(data.get(f"{period_key}:reserved", "0")))
+                if main + reserved + amount_dec > Decimal(str(limit)):
+                    return f"limit_exceeded:{period_key}"
+
+            data[reservation_key] = record
+            for period_key in period_limits:
+                reserved_key = f"{period_key}:reserved"
+                current = Decimal(str(data.get(reserved_key, "0")))
+                data[reserved_key] = str(current + amount_dec)
+
+            await self._write_collection(collection, data)
+            return "reserved"
+
+    async def commit_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        committed_at: str,
+    ) -> str:
+        """Atomically commit a budget reservation and mark it single-use."""
+        async with self._lock:
+            data = await self._read_collection(collection)
+            record = data.get(reservation_key)
+            if not record:
+                return "missing"
+            status = record.get("status")
+            if status != "reserved":
+                return str(status)
+
+            amount_dec = Decimal(str(amount))
+            for period_key in period_keys:
+                main = Decimal(str(data.get(period_key, "0")))
+                reserved_key = f"{period_key}:reserved"
+                reserved = Decimal(str(data.get(reserved_key, "0")))
+                data[period_key] = str(main + amount_dec)
+                data[reserved_key] = str(reserved - amount_dec)
+
+            record["status"] = "committed"
+            record["committed_at"] = committed_at
+            await self._write_collection(collection, data)
+            return "committed"
+
+    async def release_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        released_at: str,
+    ) -> str:
+        """Atomically release a budget reservation and mark it single-use."""
+        async with self._lock:
+            data = await self._read_collection(collection)
+            record = data.get(reservation_key)
+            if not record:
+                return "missing"
+            status = record.get("status")
+            if status != "reserved":
+                return str(status)
+
+            amount_dec = Decimal(str(amount))
+            for period_key in period_keys:
+                reserved_key = f"{period_key}:reserved"
+                reserved = Decimal(str(data.get(reserved_key, "0")))
+                data[reserved_key] = str(reserved - amount_dec)
+
+            record["status"] = "released"
+            record["released_at"] = released_at
+            await self._write_collection(collection, data)
+            return "released"
 
     async def acquire_lock(
         self,

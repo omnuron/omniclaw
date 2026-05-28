@@ -74,6 +74,9 @@ class InMemoryStorage(StorageBackend):
 
         results = []
         for key, data in coll.items():
+            if not isinstance(data, dict):
+                data = {"value": data}
+
             # Apply filters
             if filters:
                 match = True
@@ -160,6 +163,94 @@ class InMemoryStorage(StorageBackend):
         # Store as string to match Redis behavior
         coll[key] = str(new_val)
         return str(new_val)
+
+    async def create_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_limits: dict[str, str],
+        amount: str,
+        record: dict[str, Any],
+    ) -> str:
+        """Atomically create a budget reservation if every period has capacity."""
+        from decimal import Decimal
+
+        coll = self._ensure_collection(collection)
+        amount_dec = Decimal(str(amount))
+
+        for period_key, limit in period_limits.items():
+            main = Decimal(str(coll.get(period_key, "0")))
+            reserved = Decimal(str(coll.get(f"{period_key}:reserved", "0")))
+            if main + reserved + amount_dec > Decimal(str(limit)):
+                return f"limit_exceeded:{period_key}"
+
+        coll[reservation_key] = deepcopy(record)
+        for period_key in period_limits:
+            reserved_key = f"{period_key}:reserved"
+            current = Decimal(str(coll.get(reserved_key, "0")))
+            coll[reserved_key] = str(current + amount_dec)
+
+        return "reserved"
+
+    async def commit_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        committed_at: str,
+    ) -> str:
+        """Atomically commit a budget reservation and mark it single-use."""
+        from decimal import Decimal
+
+        coll = self._ensure_collection(collection)
+        record = coll.get(reservation_key)
+        if not record:
+            return "missing"
+        status = record.get("status")
+        if status != "reserved":
+            return str(status)
+
+        amount_dec = Decimal(str(amount))
+        for period_key in period_keys:
+            main = Decimal(str(coll.get(period_key, "0")))
+            reserved_key = f"{period_key}:reserved"
+            reserved = Decimal(str(coll.get(reserved_key, "0")))
+            coll[period_key] = str(main + amount_dec)
+            coll[reserved_key] = str(reserved - amount_dec)
+
+        record["status"] = "committed"
+        record["committed_at"] = committed_at
+        return "committed"
+
+    async def release_budget_reservation(
+        self,
+        collection: str,
+        reservation_key: str,
+        period_keys: list[str],
+        amount: str,
+        released_at: str,
+    ) -> str:
+        """Atomically release a budget reservation and mark it single-use."""
+        from decimal import Decimal
+
+        coll = self._ensure_collection(collection)
+        record = coll.get(reservation_key)
+        if not record:
+            return "missing"
+        status = record.get("status")
+        if status != "reserved":
+            return str(status)
+
+        amount_dec = Decimal(str(amount))
+        for period_key in period_keys:
+            reserved_key = f"{period_key}:reserved"
+            reserved = Decimal(str(coll.get(reserved_key, "0")))
+            coll[reserved_key] = str(reserved - amount_dec)
+
+        record["status"] = "released"
+        record["released_at"] = released_at
+        return "released"
 
     async def acquire_lock(
         self,

@@ -1,13 +1,27 @@
 import asyncio
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from omniclaw.client import OmniClaw
 from omniclaw.core.types import Network, PaymentResult, PaymentStatus
+from omniclaw.guards.base import PaymentContext
 from omniclaw.guards.budget import BudgetGuard
 from omniclaw.storage.memory import InMemoryStorage
+
+
+class YieldingInMemoryStorage(InMemoryStorage):
+    """In-memory storage that yields around operations to expose async races."""
+
+    async def atomic_add(self, collection: str, key: str, amount: str) -> str:
+        await asyncio.sleep(0)
+        return await super().atomic_add(collection, key, amount)
+
+    async def get(self, collection: str, key: str) -> dict[str, Any] | None:
+        await asyncio.sleep(0)
+        return await super().get(collection, key)
 
 
 @pytest.fixture
@@ -92,3 +106,38 @@ async def test_concurrent_budget_updates(client_with_storage):
 
     assert success_count <= 16, f"Budget exceeded! {success_count} payments succeeded."
     assert success_count + failed_count + exception_count == 20
+
+
+@pytest.mark.asyncio
+async def test_budget_guard_concurrent_reservations_do_not_under_authorize_with_async_storage():
+    """Concurrent reservations should admit capacity instead of all rolling back."""
+    storage = YieldingInMemoryStorage()
+    guard = BudgetGuard(total_limit=Decimal("100.00"), name="concurrent_budget", storage=storage)
+
+    async def reserve_and_commit(index: int) -> str:
+        context = PaymentContext(
+            wallet_id="wallet-concurrent",
+            recipient="0x742d35Cc6634C0532925a3b844Bc9e7595f5e4a0",
+            amount=Decimal("6.00"),
+            purpose=f"concurrent-{index}",
+        )
+        try:
+            token = await guard.reserve(context)
+        except ValueError:
+            return "rejected"
+
+        await asyncio.sleep(0.01)
+        await guard.commit(token)
+        return "success"
+
+    results = await asyncio.gather(*(reserve_and_commit(i) for i in range(20)))
+
+    assert results.count("success") == 16
+    assert results.count("rejected") == 4
+
+    total = await storage.get("guard_state", "budget:wallet-concurrent:concurrent_budget:total")
+    reserved = await storage.get(
+        "guard_state", "budget:wallet-concurrent:concurrent_budget:total:reserved"
+    )
+    assert total == "96.00"
+    assert reserved == "0.00"

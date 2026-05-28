@@ -104,6 +104,97 @@ class TestBudgetGuard:
             await guard.reserve(payment_context)
 
     @pytest.mark.asyncio
+    async def test_check_counts_reserved_capacity(self, payment_context):
+        storage = InMemoryStorage()
+        guard = BudgetGuard(daily_limit=Decimal("15.00"), storage=storage)
+
+        token = await guard.reserve(payment_context)
+        assert token is not None
+
+        result = await guard.check(payment_context)
+        assert result.allowed is False
+        assert "daily" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_commit_is_idempotent(self):
+        storage = InMemoryStorage()
+        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
+        context = PaymentContext(wallet_id="wallet-123", recipient="0x123", amount=Decimal("10.00"))
+
+        token = await guard.reserve(context)
+        await guard.commit(token)
+        await guard.commit(token)
+
+        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
+        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
+        assert total == "10.00"
+        assert reserved == "0.00"
+
+    @pytest.mark.asyncio
+    async def test_release_is_idempotent(self):
+        storage = InMemoryStorage()
+        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
+        context = PaymentContext(wallet_id="wallet-123", recipient="0x123", amount=Decimal("10.00"))
+
+        token = await guard.reserve(context)
+        await guard.release(token)
+        await guard.release(token)
+
+        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
+        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
+        assert total is None
+        assert reserved == "0.00"
+
+    @pytest.mark.asyncio
+    async def test_commit_after_release_does_not_spend(self):
+        storage = InMemoryStorage()
+        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
+        context = PaymentContext(wallet_id="wallet-123", recipient="0x123", amount=Decimal("10.00"))
+
+        token = await guard.reserve(context)
+        await guard.release(token)
+        await guard.commit(token)
+
+        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
+        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
+        assert total is None
+        assert reserved == "0.00"
+
+    @pytest.mark.asyncio
+    async def test_legacy_reservation_token_can_commit_once(self):
+        import json
+
+        storage = InMemoryStorage()
+        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
+        await storage.atomic_add("guard_state", "budget:wallet-123:budget:total:reserved", "10.00")
+        token = json.dumps({"v": 2, "w": "wallet-123", "a": "10.00", "ts": "2026-05-28T10:00:00"})
+
+        await guard.commit(token)
+        await guard.commit(token)
+
+        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
+        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
+        assert total == "10.00"
+        assert reserved == "0.00"
+
+    @pytest.mark.asyncio
+    async def test_legacy_reservation_token_can_release_once(self):
+        import json
+
+        storage = InMemoryStorage()
+        guard = BudgetGuard(total_limit=Decimal("100.00"), storage=storage)
+        await storage.atomic_add("guard_state", "budget:wallet-123:budget:total:reserved", "10.00")
+        token = json.dumps({"v": 2, "w": "wallet-123", "a": "10.00", "ts": "2026-05-28T10:00:00"})
+
+        await guard.release(token)
+        await guard.release(token)
+
+        total = await storage.get("guard_state", "budget:wallet-123:budget:total")
+        reserved = await storage.get("guard_state", "budget:wallet-123:budget:total:reserved")
+        assert total is None
+        assert reserved == "0.00"
+
+    @pytest.mark.asyncio
     async def test_hourly_limit(self, payment_context):
         guard = BudgetGuard(hourly_limit=Decimal("5.00"), storage=InMemoryStorage())
         # Check logic: check() method still works for pre-flight
